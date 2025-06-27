@@ -1,0 +1,21 @@
+#main {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+}
+
+#nav {
+    width: 300px;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+#page {
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 16px;
+}
