@@ -107,7 +107,32 @@ const routes = [
         path: '/profile',
         handler: () => {
             const page = document.createElement('div');
-            page.innerText = 'Profile editor page';
+            page.innerHTML = /*html*/`
+                <h2>User Profile</h2><br>
+                <form action="/submit-form" method "POST">
+                    <!--To get the user's name-->
+                    <label for="name">Name (required, 50 characters max):</label><br>
+                    <input type="text" id="name" maxlength="50" required><br><br>
+                    <!--To get the user's Primary Address-->
+                    <label for="address1">Address 1 (required, 100 characters max):</label><br>
+                    <input type="text" id="address1" maxlength="100" required><br><br>
+                    <!--To get the user's Secondary Address-->
+                    <label for="address2">Address 2 (optional, 100 characters max):</label><br>
+                    <input type="text" id="address2" maxlength="100"><br><br>
+                    <!--City-->
+                    <label for="city">City (required, 100 characters max)</label><br>
+                    <input type="text" id="city" maxlength="100" required><br><br>
+                    <!--State-->
+                    <label for="state">State (required)</label><br>
+                    <select name="state" id="state" required>
+                        <option value="">Select a State</option>  
+                        <option value="AL">AL</option>
+                        <!-- Insert every state here-->  
+                    </select><br><br>
+                    <!-- Unfinished-->
+                <button type="submit">Submit</button>
+                </form>
+            `
             render(page);
         }
     },
