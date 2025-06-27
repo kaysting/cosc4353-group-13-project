@@ -128,10 +128,57 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
     {
         path: '/admin/events/:eventId',
         handler: (params) => {
-            const page = document.createElement('div');
-            const eventId = params.eventId;
-            page.innerText = `Manage event ${eventId}`;
-            render(page);
+        const page = document.createElement('div');
+        page.innerHTML = /*html*/`
+            <h2>Manage Event: ${params.eventId}</h2>
+            <form id="eventForm">
+                <div class="form-group mb-3">
+                    <label for="eventName">Event Name</label>
+                    <input type="text" id="eventName" class="form-control" maxlength="100" required>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="eventDescription">Event Description</label>
+                    <textarea id="eventDescription" class="form-control" required></textarea>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="eventLocation">Location</label>
+                    <textarea id="eventLocation" class="form-control" required></textarea>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="requiredSkills">Required Skills</label>
+                    <select id="requiredSkills" class="form-select" multiple required>
+                        <option value="first_aid">First Aid</option>
+                        <option value="cooking">Cooking</option>
+                        <option value="cleaning">Cleaning</option>
+                        <option value="transport">Transport</option>
+                        <!-- Add more as needed -->
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="urgency">Urgency</label>
+                    <select id="urgency" class="form-select" required>
+                        <option value="">Select urgency</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="eventDate">Event Date</label>
+                    <input type="date" id="eventDate" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        `;
+
+        //Basic client-side validation handler
+        const form = page.querySelector('#eventForm');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Event form submitted successfully!');
+        });
+
+        render(page);
         }
     },
     // Admin event volunteer matching page
