@@ -23,18 +23,18 @@ const routes = [
             page.innerHTML = /*html*/`
                 <form>
                     <div class="form-group">
-                        <label for="loginEmail">Name</label>
-                        <input type="email" id="loginEmail" class="form-control" placeholder="What should we call you?" required>
+                        <label for="registerName">Name</label>
+                        <input type="text" id="registerName" class="form-control" placeholder="What should we call you?" required>
                         <small class="form-text text-muted">This is the name that volunteering coordinators will see.</small>
                     </div>
                     <div class="form-group">
-                        <label for="loginEmail">Email</label>
-                        <input type="email" id="loginEmail" class="form-control" placeholder="Enter your email" required>
+                        <label for="registerEmail">Email</label>
+                        <input type="email" id="registerEmail" class="form-control" placeholder="Enter your email" required>
                         <small class="form-text text-muted">We'll send volunteering notifications to this address.</small>
                     </div>
                     <div class="form-group">
-                        <label for="loginEmail">Password</label>
-                        <input type="password" id="loginPassword" class="form-control" placeholder="Enter your password" required>
+                        <label for="registerPassword">Password</label>
+                        <input type="password" id="registerPassword" class="form-control" placeholder="Enter your password" required>
                         <small class="form-text text-muted">Your password must be at least 8 characters long.</small>
                     </div>
                 </form>
