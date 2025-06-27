@@ -6,6 +6,25 @@ function render(elPageContent) {
 }
 
 const routes = [
+    // Home page
+    {
+        path: '/',
+        handler: () => {
+            const page = document.createElement('div');
+            // ...
+            render(page);
+        }
+    },
+    // User registration form
+    {
+        path: '/register',
+        handler: () => {
+            const page = document.createElement('div');
+            // ...
+            render(page);
+        }
+    },
+    // User login form
     {
         path: '/login',
         handler: () => {
@@ -14,11 +33,68 @@ const routes = [
             render(page);
         }
     },
+    // User profile editor form
     {
         path: '/profile',
         handler: () => {
             const page = document.createElement('div');
             page.innerText = 'Profile editor page';
+            render(page);
+        }
+    },
+    // Admin home page
+    {
+        path: '/admin',
+        handler: () => {
+            const page = document.createElement('div');
+            // ...
+            render(page);
+        }
+    },
+    // Admin event list
+    {
+        path: '/admin/events',
+        handler: () => {
+            const page = document.createElement('div');
+            // ...
+            render(page);
+        }
+    },
+    // Admin event management/editor page
+    {
+        path: '/admin/events/:eventId',
+        handler: (params) => {
+            const page = document.createElement('div');
+            const eventId = params.eventId;
+            page.innerText = `Manage event ${eventId}`;
+            render(page);
+        }
+    },
+    // Admin event volunteer matching page
+    {
+        path: '/admin/events/:eventId/matching',
+        handler: (params) => {
+            const page = document.createElement('div');
+            const eventId = params.eventId;
+            page.innerText = `Find volunteers for event ${eventId}`;
+            render(page);
+        }
+    },
+    // Notifications page
+    {
+        path: '/notifications',
+        handler: () => {
+            const page = document.createElement('div');
+            // ...
+            render(page);
+        }
+    },
+    // Activity page displaying event and volunteer activity history
+    {
+        path: '/activity',
+        handler: () => {
+            const page = document.createElement('div');
+            // ...
             render(page);
         }
     }
