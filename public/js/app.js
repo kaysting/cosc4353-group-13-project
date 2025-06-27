@@ -42,15 +42,61 @@ const routes = [
             render(page);
         }
     },
+    
     // User login form
     {
-        path: '/login',
-        handler: () => {
-            
-            const page = document.createElement('div');
-            render(page);
-        }
-    },
+  path: '/login',
+  handler: () => {
+    const page = document.createElement('div');
+    page.innerHTML = `
+      <h2>Login</h2>
+      <form id="loginForm">
+        <div>
+          <label for="loginEmail">Email:</label>
+          <input type="email" id="loginEmail" required />
+        </div>
+        <div>
+          <label for="loginPassword">Password:</label>
+          <input type="password" id="loginPassword" required />
+        </div>
+        <button type="submit">Login</button>
+        <p id="loginMessage" style="color:red;"></p>
+      </form>
+    `;
+
+   // submit event listener to the login form
+page.querySelector('#loginForm').addEventListener('submit', function (e) {
+  // Prevent the form from submitting the default way
+  e.preventDefault();
+
+  // values entered in the email and password fields
+  const email = page.querySelector('#loginEmail').value.trim(); // removes any leading/trailing spaces
+  const password = page.querySelector('#loginPassword').value;
+
+  // list of registered users from localStorage
+  const users = JSON.parse(localStorage.getItem('users') || '[]');
+
+  // find a user whose email and password match the input
+  const user = users.find(u => u.email === email && u.password === password);
+
+  // message (to display success/failure messages)
+  const message = page.querySelector('#loginMessage');
+
+  if (user) {
+    // If a matching user is found
+    message.style.color = 'green';
+    message.textContent = 'Login successful! Redirecting...';
+
+    setTimeout(() => {
+      window.location.hash = '#/profile';
+    }, 1000);
+  } else {
+    message.style.color = 'red';
+    message.textContent = 'Invalid email or password';
+  }
+});
+
+
     // User profile editor form
     {
         path: '/profile',
