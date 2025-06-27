@@ -98,7 +98,7 @@ const routes = [
                     message.textContent = 'Invalid email or password';
                 }
             });
-
+            render(page);
         }
     },
 
