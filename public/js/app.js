@@ -46,6 +46,7 @@ const routes = [
     {
         path: '/login',
         handler: () => {
+            
             const page = document.createElement('div');
             render(page);
         }
