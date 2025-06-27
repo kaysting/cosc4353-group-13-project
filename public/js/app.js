@@ -6,6 +6,7 @@ function render(elPageContent) {
 }
 
 const routes = [
+
     // Home page (unused for now)
     {
         path: '/',
@@ -15,6 +16,7 @@ const routes = [
             render(page);
         }
     },
+
     // User registration form
     {
         path: '/register',
@@ -39,63 +41,66 @@ const routes = [
                     </div>
                 </form>
             `;
+            // TODO: Add validation and submission
             render(page);
         }
     },
-    
+
     // User login form
     {
-  path: '/login',
-  handler: () => {
-    const page = document.createElement('div');
-    page.innerHTML = `
-      <h2>Login</h2>
-      <form id="loginForm">
-        <div>
-          <label for="loginEmail">Email:</label>
-          <input type="email" id="loginEmail" required />
-        </div>
-        <div>
-          <label for="loginPassword">Password:</label>
-          <input type="password" id="loginPassword" required />
-        </div>
-        <button type="submit">Login</button>
-        <p id="loginMessage" style="color:red;"></p>
-      </form>
-    `;
+        path: '/login',
+        handler: () => {
+            const page = document.createElement('div');
+            page.innerHTML = /*html*/`
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div>
+                    <label for="loginEmail">Email:</label>
+                    <input type="email" id="loginEmail" required />
+                    </div>
+                    <div>
+                    <label for="loginPassword">Password:</label>
+                    <input type="password" id="loginPassword" required />
+                    </div>
+                    <button type="submit">Login</button>
+                    <p id="loginMessage" style="color:red;"></p>
+                </form>
+            `;
 
-   // submit event listener to the login form
-page.querySelector('#loginForm').addEventListener('submit', function (e) {
-  // Prevent the form from submitting the default way
-  e.preventDefault();
+            // submit event listener to the login form
+            page.querySelector('#loginForm').addEventListener('submit', function (e) {
+                // Prevent the form from submitting the default way
+                e.preventDefault();
 
-  // values entered in the email and password fields
-  const email = page.querySelector('#loginEmail').value.trim(); // removes any leading/trailing spaces
-  const password = page.querySelector('#loginPassword').value;
+                // values entered in the email and password fields
+                const email = page.querySelector('#loginEmail').value.trim(); // removes any leading/trailing spaces
+                const password = page.querySelector('#loginPassword').value;
 
-  // list of registered users from localStorage
-  const users = JSON.parse(localStorage.getItem('users') || '[]');
+                // list of registered users from localStorage
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
 
-  // find a user whose email and password match the input
-  const user = users.find(u => u.email === email && u.password === password);
+                // find a user whose email and password match the input
+                const user = users.find(u => u.email === email && u.password === password);
 
-  // message (to display success/failure messages)
-  const message = page.querySelector('#loginMessage');
+                // message (to display success/failure messages)
+                const message = page.querySelector('#loginMessage');
 
-  if (user) {
-    // If a matching user is found
-    message.style.color = 'green';
-    message.textContent = 'Login successful! Redirecting...';
+                if (user) {
+                    // If a matching user is found
+                    message.style.color = 'green';
+                    message.textContent = 'Login successful! Redirecting...';
 
-    setTimeout(() => {
-      window.location.hash = '#/profile';
-    }, 1000);
-  } else {
-    message.style.color = 'red';
-    message.textContent = 'Invalid email or password';
-  }
-});
+                    setTimeout(() => {
+                        window.location.hash = '#/profile';
+                    }, 1000);
+                } else {
+                    message.style.color = 'red';
+                    message.textContent = 'Invalid email or password';
+                }
+            });
 
+        }
+    },
 
     // User profile editor form
     {
@@ -106,6 +111,7 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             render(page);
         }
     },
+
     // Admin home page (unused for now)
     {
         path: '/admin',
@@ -115,6 +121,7 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             render(page);
         }
     },
+
     // Admin event list (unused for now)
     {
         path: '/admin/events',
@@ -124,12 +131,13 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             render(page);
         }
     },
+
     // Admin event management/editor page
     {
         path: '/admin/events/:eventId',
         handler: (params) => {
-        const page = document.createElement('div');
-        page.innerHTML = /*html*/`
+            const page = document.createElement('div');
+            page.innerHTML = /*html*/`
             <h2>Manage Event: ${params.eventId}</h2>
             <form id="eventForm">
                 <div class="form-group mb-3">
@@ -171,16 +179,17 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             </form>
         `;
 
-        //Basic client-side validation handler
-        const form = page.querySelector('#eventForm');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Event form submitted successfully!');
-        });
+            // Basic client-side validation handler
+            const form = page.querySelector('#eventForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                alert('Event form submitted successfully!');
+            });
 
-        render(page);
+            render(page);
         }
     },
+
     // Admin event volunteer matching page
     {
         path: '/admin/events/:eventId/matching',
@@ -191,6 +200,7 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             render(page);
         }
     },
+
     // Notifications page
     {
         path: '/notifications',
@@ -200,6 +210,7 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             render(page);
         }
     },
+
     // Activity page displaying event and volunteer activity history
     {
         path: '/activity',
@@ -209,6 +220,7 @@ page.querySelector('#loginForm').addEventListener('submit', function (e) {
             render(page);
         }
     }
+
 ];
 
 // Path matcher: supports one :placeholder per path segment
