@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Catch-all route to serve the index.html file for any unmatched routes
-app.get('*', (req, res) => {
+app.use((req, res) => {
     res.sendFile(__dirname + '/public/index.html');
 });
 
