@@ -108,31 +108,130 @@ const routes = [
         handler: () => {
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
-                <h2>User Profile</h2><br>
-                <form action="/submit-form" method "POST">
-                    <!--To get the user's name-->
-                    <label for="name">Name (required, 50 characters max):</label><br>
-                    <input type="text" id="name" maxlength="50" required><br><br>
-                    <!--To get the user's Primary Address-->
-                    <label for="address1">Address 1 (required, 100 characters max):</label><br>
-                    <input type="text" id="address1" maxlength="100" required><br><br>
-                    <!--To get the user's Secondary Address-->
-                    <label for="address2">Address 2 (optional, 100 characters max):</label><br>
-                    <input type="text" id="address2" maxlength="100"><br><br>
-                    <!--City-->
-                    <label for="city">City (required, 100 characters max)</label><br>
-                    <input type="text" id="city" maxlength="100" required><br><br>
-                    <!--State-->
-                    <label for="state">State (required)</label><br>
-                    <select name="state" id="state" required>
-                        <option value="">Select a State</option>  
-                        <option value="AL">AL</option>
-                        <!-- Insert every state here-->  
-                    </select><br><br>
-                    <!-- Unfinished-->
-                <button type="submit">Submit</button>
+                <h1>User Profile</h1><br>
+                <!-- Everything in read only, switched off and on by edit and save buttons.-->
+                <form id="profileForm">
+                    <label>Full Name:
+                        <input type="text" id="fullName" maxlength="50" required readonly>
+                    </label><br><br>
+
+                    <label>Address 1:
+                        <input type="text" id="address1" maxlength="100" required readonly>
+                    </label><br><br>
+
+                    <label>Address 2 (Optional):
+                        <input type="text" id="address2" maxlength="100" readonly>
+                    </label><br><br>
+
+                    <label>City:
+                        <input type="text" id="city" maxlength="100" required readonly>
+                    </label>
+
+                    <label>State:
+                        <select id="state" required disabled>
+                            <option value="">Select a state</option>
+                            <option value="AZ">Arizona</option>
+                            <option value="AK">Arkansas</option>
+                            <option value="FL">Florida</option>
+                            <option value="TX">Texas</option>
+                            <!-- Add options for more states here-->
+                        </select>
+                    </label>
+
+                    <label>Zip Code:
+                        <input type="text" id="zipCode" maxlength="9" pattern=".{5,9}" required readonly>
+                    </label><br><br><br>
+
+                    <label>Skills:
+                        <select id="skills" multiple required disabled>
+                            <!-- Need to add more skills here-->
+                            <option value="html">HTML</option>
+                            <option value="css">CSS</option>
+                            <option value="javascript">JS</option>
+                        </select>
+                    </label><br><br>
+
+                    <label>Preferences:
+                        <textarea id="preferences" readonly></textarea>
+                    </label><br><br><br>
+
+                    <label>Availability:
+                        <input type="date" id="availability" required readonly>
+                    </label><br><br>
+
+                    <button type="button" id="editButton">Edit</button>
+                    <button type="submit" id="saveButton" style="display:none">Save</button>
                 </form>
-            `
+                `;
+                //Testing purposes (Edit when Database is added, breaks after single use, reload page to try again)
+                let userData = {
+                    fullName: "Placeholder Name",
+                    address1: "123 Street St",
+                    address2: "64 Apt",
+                    city: "Houston",
+                    state: "TX",
+                    zipCode: "77001",
+                    skills: ["html", "css"],
+                    preferences: "Prefers remote work",
+                    availability: "2025-07-01"
+                };
+                window.onload = function(){
+                    loadProfile();
+                    document.getElementById('editButton').addEventListener('click', enableEditing);
+                    document.getElementById('profileForm').addEventListener('submit', saveProfile);
+                };
+                function loadProfile(){
+                    document.getElementById('fullName').value = userData.fullName;
+                    document.getElementById('address1').value = userData.address1;
+                    document.getElementById('address2').value = userData.address2;
+                    document.getElementById('city').value = userData.city;
+                    document.getElementById('state').value = userData.state;
+                    document.getElementById('zipCode').value = userData.zipCode;
+                    document.getElementById('preferences').value = userData.preferences;
+                    document.getElementById('availability').value = userData.availability;
+                    let skillsSelect = document.getElementById('skills');
+                    for (let option of skillsSelect.options){
+                        if (userData.skills.includes(option.value)){
+                            option.selected = true;
+                        }
+                    }
+                }
+                function enableEditing(){
+                    let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
+                    formElements.forEach(el => el.removeAttribute('readonly'));
+                    document.getElementById('state').disabled = false;
+                    document.getElementById('skills').disabled = false;
+
+                    document.getElementById('editButton').style.display = 'none';
+                    document.getElementById('saveButton').style.display = 'inline';
+                }
+                function saveProfile(event){
+                    event.preventDefault();
+                    userData.fullName = document.getElementById('fullName').value;
+                    userData.address1 = document.getElementById('address1').value;
+                    userData.address2 = document.getElementById('address2').value;
+                    userData.city = document.getElementById('city').value;
+                    userData.state = document.getElementById('state').value;
+                    userData.zipCode = document.getElementById('zipCode').value;
+                    userData.preferences = document.getElementById('preferences').value;
+                    userData.availability = document.getElementById('availability').value;
+
+                    let selectedSkills = [];
+                    let skillsSelect = document.getElementById('skills');
+                    for(let option of skillsSelect.selectedOptions){
+                        selectedSkills.push(option.value);
+                    }
+                    userData.skills = selectedSkills;
+
+                    alert('Profile updated successfully!');
+
+                    let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
+                    formElements.forEach(el => el.setAttribute('readonly', true));
+                    document.getElementById('state').disabled = true;
+                    document.getElementById('skills').disabled = true;
+                    document.getElementById('editButton').style.display = 'inline';
+                    document.getElementById('saveButton').style.display = 'none';
+                }
             render(page);
         }
     },
