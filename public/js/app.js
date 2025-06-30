@@ -316,14 +316,70 @@ const routes = [
 
     // Admin event volunteer matching page
     {
-        path: '/admin/events/:eventId/matching',
-        handler: (params) => {
-            const page = document.createElement('div');
-            const eventId = params.eventId;
-            page.innerText = `Find volunteers for event ${eventId}`;
-            render(page);
-        }
-    },
+    path: '/admin/events/:eventId/matching',
+    handler: (params) => {
+        const page = document.createElement('div');
+        const eventId = params.eventId;
+
+        // Mock data for volunteers and events
+        const mockVolunteers = [
+            { id: 1, name: "John Doe", skills: ["first_aid", "cooking"], location: "Houston, TX", availability: "2025-07-01" },
+            { id: 2, name: "Jane Smith", skills: ["cleaning", "transport"], location: "Austin, TX", availability: "2025-07-02" },
+        ];
+        const mockEvents = [
+            { id: "1", name: "Community Cleanup", requiredSkills: ["cleaning"], location: "Houston, TX", date: "2025-07-01" },
+            { id: "2", name: "Food Drive", requiredSkills: ["cooking"], location: "Austin, TX", date: "2025-07-02" },
+        ];
+
+        // Find the current event
+        const currentEvent = mockEvents.find(e => e.id === eventId) || { name: `Event ${eventId}`, requiredSkills: [], location: "", date: "" };
+
+        // Match volunteers based on skills, location, and availability
+        const matchedVolunteers = mockVolunteers.filter(v => 
+            v.skills.some(skill => currentEvent.requiredSkills.includes(skill)) &&
+            v.location === currentEvent.location &&
+            v.availability === currentEvent.date
+        );
+
+        page.innerHTML = /*html*/`
+            <h2>Volunteer Matching for ${currentEvent.name}</h2>
+            <form id="volunteerMatchingForm" class="mb-3">
+                <div class="form-group mb-3">
+                    <label for="volunteerSelect">Select Volunteer</label>
+                    <select id="volunteerSelect" class="form-select" required>
+                        <option value="">Select a volunteer</option>
+                        ${matchedVolunteers.map(v => `<option value="${v.id}">${v.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="eventName">Matched Event</label>
+                    <input type="text" id="eventName" class="form-control" value="${currentEvent.name}" readonly>
+                </div>
+                <button type="submit" class="btn btn-primary">Assign Volunteer</button>
+            </form>
+            <div id="formMessage" style="color: green;"></div>
+        `;
+
+        // Form submission handler
+        const form = page.querySelector('#volunteerMatchingForm');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const volunteerId = page.querySelector('#volunteerSelect').value;
+            if (!volunteerId) {
+                page.querySelector('#formMessage').style.color = 'red';
+                page.querySelector('#formMessage').textContent = 'Please select a volunteer.';
+                return;
+            }
+            page.querySelector('#formMessage').style.color = 'green';
+            page.querySelector('#formMessage').textContent = `Volunteer assigned to ${currentEvent.name} successfully!`;
+            setTimeout(() => {
+                navigate('/admin/events');
+            }, 1000);
+        });
+
+        render(page);
+    }
+},
 
     // Notifications page
     {
