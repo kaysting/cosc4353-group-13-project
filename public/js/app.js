@@ -23,23 +23,26 @@ const routes = [
         handler: () => {
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
+                <h2>Register</h2>
                 <form>
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label for="registerName">Name</label>
                         <input type="text" id="registerName" class="form-control" placeholder="What should we call you?" required>
                         <small class="form-text text-muted">This is the name that volunteering coordinators will see.</small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label for="registerEmail">Email</label>
                         <input type="email" id="registerEmail" class="form-control" placeholder="Enter your email" required>
                         <small class="form-text text-muted">We'll send volunteering notifications to this address.</small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label for="registerPassword">Password</label>
                         <input type="password" id="registerPassword" class="form-control" placeholder="Enter your password" required>
                         <small class="form-text text-muted">Your password must be at least 8 characters long.</small>
                     </div>
-                    <button type="registerSubmit">Register</button>
+                    <div class="form-group mb-3">
+                        <button id="registerSubmit" type="submit" class="btn btn-primary">Register</button>
+                    </div>
                 </form>
             `;
             const inputName = page.querySelector('#registerName');
