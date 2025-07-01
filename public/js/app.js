@@ -433,23 +433,116 @@ const routes = [
 
     // Notifications page
     {
-        path: '/notifications',
-        handler: () => {
-            const page = document.createElement('div');
-            // ...
-            render(page);
-        }
-    },
+    path: '/notifications',
+    handler: () => {
+        const page = document.createElement('div');
+
+        // Mock notification data
+        const mockNotifications = [
+            { id: 1, message: "hello" },
+            { id: 2, message: "hey" },
+            { id: 3, message: "hi" },
+        ];
+
+        page.innerHTML = /*html*/`
+            <h2>Notifications</h2>
+            <div id="notificationList">
+                ${mockNotifications.length === 0 ? '<p>No notifications available.</p>' : ''}
+                <ul class="list-group">
+                    ${mockNotifications.map(n => /*html*/`
+                        <li class="list-group-item">
+                            <strong>${n.type.charAt(0).toUpperCase() + n.type.slice(1)}:</strong> ${n.message}
+                            <br><small>${n.date}</small>
+                            <button class="btn btn-sm btn-danger float-end dismiss-btn" data-id="${n.id}">Dismiss</button>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+
+        // Add dismiss button functionality
+        page.querySelectorAll('.dismiss-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                button.parentElement.remove();
+                // Update mockNotifications (in a real app, this would update a database)
+                const updatedNotifications = mockNotifications.filter(n => n.id !== parseInt(id));
+                // Note: Update mockNotifications in a real app
+                if (page.querySelectorAll('.list-group-item').length === 0) {
+                    page.querySelector('#notificationList').innerHTML = '<p>No notifications available.</p>';
+                }
+            });
+        });
+
+        render(page);
+    }
+},
 
     // Activity page displaying event and volunteer activity history
-    {
-        path: '/activity',
-        handler: () => {
-            const page = document.createElement('div');
-            // ...
-            render(page);
-        }
+   {
+    path: '/activity',
+    handler: () => {
+        const page = document.createElement('div');
+
+        // Mock volunteer history data
+        const mockHistory = [
+            {
+                eventId: "1",
+                eventName: "Community Cleanup",
+                description: "City-wide cleanup initiative",
+                location: "Houston, TX",
+                requiredSkills: ["cleaning"],
+                urgency: "Medium",
+                date: "2025-07-01",
+                status: "Completed"
+            },
+            {
+                eventId: "2",
+                eventName: "Food Drive",
+                description: "Distribute food to local shelters",
+                location: "Austin, TX",
+                requiredSkills: ["cooking"],
+                urgency: "High",
+                date: "2025-07-02",
+                status: "Pending"
+            },
+        ];
+
+        page.innerHTML = /*html*/`
+            <h2>Volunteer History</h
+
+2>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Event Name</th>
+                        <th>Description</th>
+                        <th>Location</th>
+                        <th>Required Skills</th>
+                        <th>Urgency</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${mockHistory.map(h => /*html*/`
+                        <tr>
+                            <td>${h.eventName}</td>
+                            <td>${h.description}</td>
+                            <td>${h.location}</td>
+                            <td>${h.requiredSkills.join(', ')}</td>
+                            <td>${h.urgency}</td>
+                            <td>${h.date}</td>
+                            <td>${h.status}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        render(page);
     }
+}
 
 ];
 
