@@ -217,63 +217,68 @@ const routes = [
                 preferences: "Prefers remote work",
                 availability: "2025-07-01"
             };
-            window.onload = function () {
-                loadProfile();
-                document.getElementById('editButton').addEventListener('click', enableEditing);
-                document.getElementById('profileForm').addEventListener('submit', saveProfile);
-            };
+            const inputFullName = page.querySelector('#fullName');
+            const inputAddress1 = page.querySelector('#address1');
+            const inputAddress2 = page.querySelector('#address2');
+            const inputCity = page.querySelector('#city');
+            const inputState = page.querySelector('#state');
+            const inputZipCode = page.querySelector('#zipCode');
+            const inputSkills = page.querySelector('#skills');
+            const inputPreferences = page.querySelector('#preferences');
+            const inputAvailability = page.querySelector('#availability');
+            const btnEdit = page.querySelector('#editButton');
+            const btnSave = page.querySelector('#saveButton');
+            const form = page.querySelector('#profileForm');
+
             function loadProfile() {
-                document.getElementById('fullName').value = userData.fullName;
-                document.getElementById('address1').value = userData.address1;
-                document.getElementById('address2').value = userData.address2;
-                document.getElementById('city').value = userData.city;
-                document.getElementById('state').value = userData.state;
-                document.getElementById('zipCode').value = userData.zipCode;
-                document.getElementById('preferences').value = userData.preferences;
-                document.getElementById('availability').value = userData.availability;
-                let skillsSelect = document.getElementById('skills');
-                for (let option of skillsSelect.options) {
-                    if (userData.skills.includes(option.value)) {
-                        option.selected = true;
-                    }
+                inputFullName.value = userData.fullName;
+                inputAddress1.value = userData.address1;
+                inputAddress2.value = userData.address2;
+                inputCity.value = userData.city;
+                inputState.value = userData.state;
+                inputZipCode.value = userData.zipCode;
+                inputPreferences.value = userData.preferences;
+                inputAvailability.value = userData.availability;
+                for (let option of inputSkills.options) {
+                    option.selected = userData.skills.includes(option.value);
                 }
             }
-            function enableEditing() {
-                let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
-                formElements.forEach(el => el.removeAttribute('readonly'));
-                document.getElementById('state').disabled = false;
-                document.getElementById('skills').disabled = false;
+            loadProfile();
 
-                document.getElementById('editButton').style.display = 'none';
-                document.getElementById('saveButton').style.display = 'inline';
+            function enableEditing() {
+                const formElements = form.querySelectorAll('input, select, textarea');
+                formElements.forEach(el => el.removeAttribute('readonly'));
+                inputState.disabled = false;
+                inputSkills.disabled = false;
+                btnEdit.style.display = 'none';
+                btnSave.style.display = 'inline';
             }
+
             function saveProfile(event) {
                 event.preventDefault();
-                userData.fullName = document.getElementById('fullName').value;
-                userData.address1 = document.getElementById('address1').value;
-                userData.address2 = document.getElementById('address2').value;
-                userData.city = document.getElementById('city').value;
-                userData.state = document.getElementById('state').value;
-                userData.zipCode = document.getElementById('zipCode').value;
-                userData.preferences = document.getElementById('preferences').value;
-                userData.availability = document.getElementById('availability').value;
+                userData.fullName = inputFullName.value;
+                userData.address1 = inputAddress1.value;
+                userData.address2 = inputAddress2.value;
+                userData.city = inputCity.value;
+                userData.state = inputState.value;
+                userData.zipCode = inputZipCode.value;
+                userData.preferences = inputPreferences.value;
+                userData.availability = inputAvailability.value;
 
-                let selectedSkills = [];
-                let skillsSelect = document.getElementById('skills');
-                for (let option of skillsSelect.selectedOptions) {
-                    selectedSkills.push(option.value);
-                }
-                userData.skills = selectedSkills;
+                userData.skills = Array.from(inputSkills.selectedOptions).map(option => option.value);
 
                 alert('Profile updated successfully!');
 
-                let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
+                const formElements = form.querySelectorAll('input, select, textarea');
                 formElements.forEach(el => el.setAttribute('readonly', true));
-                document.getElementById('state').disabled = true;
-                document.getElementById('skills').disabled = true;
-                document.getElementById('editButton').style.display = 'inline';
-                document.getElementById('saveButton').style.display = 'none';
+                inputState.disabled = true;
+                inputSkills.disabled = true;
+                btnEdit.style.display = 'inline';
+                btnSave.style.display = 'none';
             }
+
+            btnEdit.addEventListener('click', enableEditing);
+            form.addEventListener('submit', saveProfile);
             render(page);
         }
     },
