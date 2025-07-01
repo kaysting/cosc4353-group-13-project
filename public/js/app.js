@@ -39,9 +39,51 @@ const routes = [
                         <input type="password" id="registerPassword" class="form-control" placeholder="Enter your password" required>
                         <small class="form-text text-muted">Your password must be at least 8 characters long.</small>
                     </div>
+                    <button type="registerSubmit">Register</button>
                 </form>
             `;
-            // TODO: Add validation and submission
+            const inputName = page.querySelector('#registerName');
+            const inputEmail = page.querySelector('#registerEmail');
+            const inputPassword = page.querySelector('#registerPassword');
+            const btnSubmit = page.querySelector('#registerSubmit');
+            // Name must be between 3 and 50 characters
+            inputName.addEventListener('input', () => {
+                if (inputName.value.length < 3 || inputName.value.length > 50) {
+                    inputName.setCustomValidity('Name must be between 3 and 50 characters');
+                } else {
+                    inputName.setCustomValidity('');
+                }
+            });
+            // Email must be a valid email address
+            inputEmail.addEventListener('input', () => {
+                const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailPattern.test(inputEmail.value)) {
+                    inputEmail.setCustomValidity('Please enter a valid email address');
+                } else {
+                    inputEmail.setCustomValidity('');
+                }
+            });
+            // Password must be at least 8 characters long
+            inputPassword.addEventListener('input', () => {
+                if (inputPassword.value.length < 8) {
+                    inputPassword.setCustomValidity('Password must be at least 8 characters long');
+                } else {
+                    inputPassword.setCustomValidity('');
+                }
+            });
+            // Handle submit
+            btnSubmit.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!inputName.checkValidity() || !inputEmail.checkValidity() || !inputPassword.checkValidity()) return;
+
+                const name = inputName.value.trim();
+                const email = inputEmail.value.trim();
+                const password = inputPassword.value;
+
+                // TODO: Interface with server...
+
+                window.location.hash = '/login';
+            });
             render(page);
         }
     },
@@ -91,7 +133,7 @@ const routes = [
                     message.textContent = 'Login successful! Redirecting...';
 
                     setTimeout(() => {
-                        window.location.hash = '#/profile';
+                        window.location.hash = '/profile'; // Removed hash sign - Kayla
                     }, 1000);
                 } else {
                     message.style.color = 'red';
@@ -163,75 +205,75 @@ const routes = [
                     <button type="submit" id="saveButton" style="display:none">Save</button>
                 </form>
                 `;
-                //Testing purposes (Edit when Database is added, breaks after single use, reload page to try again)
-                let userData = {
-                    fullName: "Placeholder Name",
-                    address1: "123 Street St",
-                    address2: "64 Apt",
-                    city: "Houston",
-                    state: "TX",
-                    zipCode: "77001",
-                    skills: ["html", "css"],
-                    preferences: "Prefers remote work",
-                    availability: "2025-07-01"
-                };
-                window.onload = function(){
-                    loadProfile();
-                    document.getElementById('editButton').addEventListener('click', enableEditing);
-                    document.getElementById('profileForm').addEventListener('submit', saveProfile);
-                };
-                function loadProfile(){
-                    document.getElementById('fullName').value = userData.fullName;
-                    document.getElementById('address1').value = userData.address1;
-                    document.getElementById('address2').value = userData.address2;
-                    document.getElementById('city').value = userData.city;
-                    document.getElementById('state').value = userData.state;
-                    document.getElementById('zipCode').value = userData.zipCode;
-                    document.getElementById('preferences').value = userData.preferences;
-                    document.getElementById('availability').value = userData.availability;
-                    let skillsSelect = document.getElementById('skills');
-                    for (let option of skillsSelect.options){
-                        if (userData.skills.includes(option.value)){
-                            option.selected = true;
-                        }
+            //Testing purposes (Edit when Database is added, breaks after single use, reload page to try again)
+            let userData = {
+                fullName: "Placeholder Name",
+                address1: "123 Street St",
+                address2: "64 Apt",
+                city: "Houston",
+                state: "TX",
+                zipCode: "77001",
+                skills: ["html", "css"],
+                preferences: "Prefers remote work",
+                availability: "2025-07-01"
+            };
+            window.onload = function () {
+                loadProfile();
+                document.getElementById('editButton').addEventListener('click', enableEditing);
+                document.getElementById('profileForm').addEventListener('submit', saveProfile);
+            };
+            function loadProfile() {
+                document.getElementById('fullName').value = userData.fullName;
+                document.getElementById('address1').value = userData.address1;
+                document.getElementById('address2').value = userData.address2;
+                document.getElementById('city').value = userData.city;
+                document.getElementById('state').value = userData.state;
+                document.getElementById('zipCode').value = userData.zipCode;
+                document.getElementById('preferences').value = userData.preferences;
+                document.getElementById('availability').value = userData.availability;
+                let skillsSelect = document.getElementById('skills');
+                for (let option of skillsSelect.options) {
+                    if (userData.skills.includes(option.value)) {
+                        option.selected = true;
                     }
                 }
-                function enableEditing(){
-                    let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
-                    formElements.forEach(el => el.removeAttribute('readonly'));
-                    document.getElementById('state').disabled = false;
-                    document.getElementById('skills').disabled = false;
+            }
+            function enableEditing() {
+                let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
+                formElements.forEach(el => el.removeAttribute('readonly'));
+                document.getElementById('state').disabled = false;
+                document.getElementById('skills').disabled = false;
 
-                    document.getElementById('editButton').style.display = 'none';
-                    document.getElementById('saveButton').style.display = 'inline';
+                document.getElementById('editButton').style.display = 'none';
+                document.getElementById('saveButton').style.display = 'inline';
+            }
+            function saveProfile(event) {
+                event.preventDefault();
+                userData.fullName = document.getElementById('fullName').value;
+                userData.address1 = document.getElementById('address1').value;
+                userData.address2 = document.getElementById('address2').value;
+                userData.city = document.getElementById('city').value;
+                userData.state = document.getElementById('state').value;
+                userData.zipCode = document.getElementById('zipCode').value;
+                userData.preferences = document.getElementById('preferences').value;
+                userData.availability = document.getElementById('availability').value;
+
+                let selectedSkills = [];
+                let skillsSelect = document.getElementById('skills');
+                for (let option of skillsSelect.selectedOptions) {
+                    selectedSkills.push(option.value);
                 }
-                function saveProfile(event){
-                    event.preventDefault();
-                    userData.fullName = document.getElementById('fullName').value;
-                    userData.address1 = document.getElementById('address1').value;
-                    userData.address2 = document.getElementById('address2').value;
-                    userData.city = document.getElementById('city').value;
-                    userData.state = document.getElementById('state').value;
-                    userData.zipCode = document.getElementById('zipCode').value;
-                    userData.preferences = document.getElementById('preferences').value;
-                    userData.availability = document.getElementById('availability').value;
+                userData.skills = selectedSkills;
 
-                    let selectedSkills = [];
-                    let skillsSelect = document.getElementById('skills');
-                    for(let option of skillsSelect.selectedOptions){
-                        selectedSkills.push(option.value);
-                    }
-                    userData.skills = selectedSkills;
+                alert('Profile updated successfully!');
 
-                    alert('Profile updated successfully!');
-
-                    let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
-                    formElements.forEach(el => el.setAttribute('readonly', true));
-                    document.getElementById('state').disabled = true;
-                    document.getElementById('skills').disabled = true;
-                    document.getElementById('editButton').style.display = 'inline';
-                    document.getElementById('saveButton').style.display = 'none';
-                }
+                let formElements = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
+                formElements.forEach(el => el.setAttribute('readonly', true));
+                document.getElementById('state').disabled = true;
+                document.getElementById('skills').disabled = true;
+                document.getElementById('editButton').style.display = 'inline';
+                document.getElementById('saveButton').style.display = 'none';
+            }
             render(page);
         }
     },
@@ -316,32 +358,32 @@ const routes = [
 
     // Admin event volunteer matching page
     {
-    path: '/admin/events/:eventId/matching',
-    handler: (params) => {
-        const page = document.createElement('div');
-        const eventId = params.eventId;
+        path: '/admin/events/:eventId/matching',
+        handler: (params) => {
+            const page = document.createElement('div');
+            const eventId = params.eventId;
 
-        // Mock data for volunteers and events
-        const mockVolunteers = [
-            { id: 1, name: "John Doe", skills: ["first_aid", "cooking"], location: "Houston, TX", availability: "2025-07-01" },
-            { id: 2, name: "Jane Smith", skills: ["cleaning", "transport"], location: "Austin, TX", availability: "2025-07-02" },
-        ];
-        const mockEvents = [
-            { id: "1", name: "Community Cleanup", requiredSkills: ["cleaning"], location: "Houston, TX", date: "2025-07-01" },
-            { id: "2", name: "Food Drive", requiredSkills: ["cooking"], location: "Austin, TX", date: "2025-07-02" },
-        ];
+            // Mock data for volunteers and events
+            const mockVolunteers = [
+                { id: 1, name: "John Doe", skills: ["first_aid", "cooking"], location: "Houston, TX", availability: "2025-07-01" },
+                { id: 2, name: "Jane Smith", skills: ["cleaning", "transport"], location: "Austin, TX", availability: "2025-07-02" },
+            ];
+            const mockEvents = [
+                { id: "1", name: "Community Cleanup", requiredSkills: ["cleaning"], location: "Houston, TX", date: "2025-07-01" },
+                { id: "2", name: "Food Drive", requiredSkills: ["cooking"], location: "Austin, TX", date: "2025-07-02" },
+            ];
 
-        // Find the current event
-        const currentEvent = mockEvents.find(e => e.id === eventId) || { name: `Event ${eventId}`, requiredSkills: [], location: "", date: "" };
+            // Find the current event
+            const currentEvent = mockEvents.find(e => e.id === eventId) || { name: `Event ${eventId}`, requiredSkills: [], location: "", date: "" };
 
-        // Match volunteers based on skills, location, and availability
-        const matchedVolunteers = mockVolunteers.filter(v => 
-            v.skills.some(skill => currentEvent.requiredSkills.includes(skill)) &&
-            v.location === currentEvent.location &&
-            v.availability === currentEvent.date
-        );
+            // Match volunteers based on skills, location, and availability
+            const matchedVolunteers = mockVolunteers.filter(v =>
+                v.skills.some(skill => currentEvent.requiredSkills.includes(skill)) &&
+                v.location === currentEvent.location &&
+                v.availability === currentEvent.date
+            );
 
-        page.innerHTML = /*html*/`
+            page.innerHTML = /*html*/`
             <h2>Volunteer Matching for ${currentEvent.name}</h2>
             <form id="volunteerMatchingForm" class="mb-3">
                 <div class="form-group mb-3">
@@ -360,26 +402,26 @@ const routes = [
             <div id="formMessage" style="color: green;"></div>
         `;
 
-        // Form submission handler
-        const form = page.querySelector('#volunteerMatchingForm');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const volunteerId = page.querySelector('#volunteerSelect').value;
-            if (!volunteerId) {
-                page.querySelector('#formMessage').style.color = 'red';
-                page.querySelector('#formMessage').textContent = 'Please select a volunteer.';
-                return;
-            }
-            page.querySelector('#formMessage').style.color = 'green';
-            page.querySelector('#formMessage').textContent = `Volunteer assigned to ${currentEvent.name} successfully!`;
-            setTimeout(() => {
-                navigate('/admin/events');
-            }, 1000);
-        });
+            // Form submission handler
+            const form = page.querySelector('#volunteerMatchingForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const volunteerId = page.querySelector('#volunteerSelect').value;
+                if (!volunteerId) {
+                    page.querySelector('#formMessage').style.color = 'red';
+                    page.querySelector('#formMessage').textContent = 'Please select a volunteer.';
+                    return;
+                }
+                page.querySelector('#formMessage').style.color = 'green';
+                page.querySelector('#formMessage').textContent = `Volunteer assigned to ${currentEvent.name} successfully!`;
+                setTimeout(() => {
+                    navigate('/admin/events');
+                }, 1000);
+            });
 
-        render(page);
-    }
-},
+            render(page);
+        }
+    },
 
     // Notifications page
     {
