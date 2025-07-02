@@ -318,40 +318,56 @@ const routes = [
                     <label for="eventName">Event Name</label>
                     <input type="text" id="eventName" class="form-control" maxlength="100" required>
                 </div>
+
                 <div class="form-group mb-3">
                     <label for="eventDescription">Event Description</label>
                     <textarea id="eventDescription" class="form-control" required></textarea>
                 </div>
+
                 <div class="form-group mb-3">
                     <label for="eventLocation">Location</label>
                     <textarea id="eventLocation" class="form-control" required></textarea>
                 </div>
+
                 <div class="form-group mb-3">
                     <label for="requiredSkills">Required Skills</label>
-                    <select id="requiredSkills" class="form-select" multiple required>
-                        <option value="first_aid">First Aid</option>
+                    <small class="form-text text-muted">Hold Ctrl (Windows) or Command (Mac) to select multiple skills.</small>
+                    <select id="requiredSkills" class="form-select mb-2" multiple required size="4">
+                        <option value="bilingual">Bilingual</option>
+                        <option value="carpentry">Carpentry</option>
                         <option value="cooking">Cooking</option>
                         <option value="cleaning">Cleaning</option>
+                        <option value="digital_marketing">Digital Marketing</option>
+                        <option value="first_aid">First Aid</option>
+                        <option value="physical_trainer">Physical Trainer</option>
                         <option value="transport">Transport</option>
-                        <!-- Add more as needed -->
+                        <!-- Add more -->
                     </select>
+
+                    <div class="input-group mb-2">
+                        <input type="text" id="newSkill" class="form-control" placeholder="Add a new skill">
+                        <button type="button" class="btn btn-outline-secondary" id="addSkillBtn">Add Skill</button>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm" id="removeSkillBtn">Remove Selected Skill(s)</button>
                 </div>
+
                 <div class="form-group mb-3">
                     <label for="urgency">Urgency</label>
                     <select id="urgency" class="form-select" required>
-                        <option value="">Select urgency</option>
+                        <option value="" disabled selected hidden>Select urgency</option>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
                 </div>
+
                 <div class="form-group mb-3">
                     <label for="eventDate">Event Date</label>
                     <input type="date" id="eventDate" class="form-control" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
-        `;
+            `;
 
             // Basic client-side validation handler
             const form = page.querySelector('#eventForm');
@@ -361,6 +377,60 @@ const routes = [
             });
 
             render(page);
+
+            // Allow dynamic skill addition
+            const addSkillBtn = page.querySelector('#addSkillBtn');
+            const newSkillInput = page.querySelector('#newSkill');
+            const skillsSelect = page.querySelector('#requiredSkills');
+
+            addSkillBtn.addEventListener('click', () => {
+                const newSkill = newSkillInput.value.trim();
+                if (!newSkill) return;
+
+                const normalized = newSkill.toLowerCase();
+
+                // Check for duplicates (case-insensitive)
+                const existingOptions = Array.from(skillsSelect.options);
+                const isDuplicate = existingOptions.some(opt => opt.textContent.toLowerCase() === normalized);
+                if (isDuplicate) {
+                    alert(`"${newSkill}" is already in the skill list.`);
+                    return;
+                }
+
+                // Add new option
+                const option = document.createElement('option');
+                option.value = normalized.replace(/\s+/g, '_'); // e.g., "first aid" -> "first_aid"
+                option.textContent = newSkill;
+                option.selected = true;
+                skillsSelect.appendChild(option);
+
+                // Sort options alphabetically
+                const allOptions = Array.from(skillsSelect.options);
+                allOptions.sort((a, b) => a.textContent.localeCompare(b.textContent));
+                skillsSelect.innerHTML = '';
+                allOptions.forEach(opt => skillsSelect.appendChild(opt));
+
+                // Clear input
+                newSkillInput.value = '';
+
+                // Confirmation popup
+                alert(`"${newSkill}" has been successfully added to the skill list.`);
+            });
+
+            const removeSkillBtn = page.querySelector('#removeSkillBtn');
+            removeSkillBtn.addEventListener('click', () => {
+                const selectedOptions = Array.from(skillsSelect.selectedOptions);
+
+                if (selectedOptions.length === 0) {
+                    alert('Please select at least one skill to remove.');
+                    return;
+                }
+
+                const confirmDelete = confirm(`Are you sure you want to remove the selected skill(s)?`);
+                if (!confirmDelete) return;
+
+                selectedOptions.forEach(opt => opt.remove());
+            });
         }
     },
 
