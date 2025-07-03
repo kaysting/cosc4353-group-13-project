@@ -153,62 +153,73 @@ const routes = [
         handler: () => {
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
-                <h1>User Profile</h1><br>
-                <!-- Everything in read only, switched off and on by edit and save buttons.-->
-                <form id="profileForm">
-                    <label>Full Name:
-                        <input type="text" id="fullName" maxlength="50" required readonly>
-                    </label><br><br>
+                <div class="container mt-5">
+                    <h1 class="mb-4">User Profile</h1>
+                    
+                    <form id="profileForm">
+                        <div class="mb-3">
+                            <label for="fullName" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="fullName" maxlength="50" required readonly>
+                        </div>
 
-                    <label>Address 1:
-                        <input type="text" id="address1" maxlength="100" required readonly>
-                    </label><br><br>
+                        <div class="mb-3">
+                            <label for="address1" class="form-label">Address 1</label>
+                            <input type="text" class="form-control" id="address1" maxlength="100" required readonly>
+                        </div>
 
-                    <label>Address 2 (Optional):
-                        <input type="text" id="address2" maxlength="100" readonly>
-                    </label><br><br>
+                        <div class="mb-3">
+                            <label for="address2" class="form-label">Address 2 (Optional)</label>
+                            <input type="text" class="form-control" id="address2" maxlength="100" readonly>
+                        </div>
 
-                    <label>City:
-                        <input type="text" id="city" maxlength="100" required readonly>
-                    </label>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="city" maxlength="100" required readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="state" class="form-label">State</label>
+                                <select id="state" class="form-select" required disabled>
+                                    <option value="">Select State</option>
+                                    <option value="TX">Texas</option>
+                                    <option value="FL">Florida</option>
+                                    <option value="AZ">Arizona</option>
+                                    <option value="CA">California</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="zipCode" class="form-label">Zip Code</label>
+                                <input type="text" class="form-control" id="zipCode" maxlength="9" pattern=".{5,9}" required readonly>
+                            </div>
+                        </div>
 
-                    <label>State:
-                        <select id="state" required disabled>
-                            <option value="">Select a state</option>
-                            <option value="AZ">Arizona</option>
-                            <option value="AK">Arkansas</option>
-                            <option value="FL">Florida</option>
-                            <option value="TX">Texas</option>
-                            <!-- Add options for more states here-->
-                        </select>
-                    </label>
+                        <div class="mb-3">
+                            <label for="skills" class="form-label">Skills</label>
+                            <select id="skills" class="form-select" multiple required disabled>
+                                <option value="html">HTML</option>
+                                <option value="css">CSS</option>
+                                <option value="javascript">JSS</option>
+                            </select>
+                        </div>
 
-                    <label>Zip Code:
-                        <input type="text" id="zipCode" maxlength="9" pattern=".{5,9}" required readonly>
-                    </label><br><br><br>
+                        <div class="mb-3">
+                            <label for="preferences" class="form-label">Preferences</label>
+                            <textarea id="preferences" class="form-control" rows="3" readonly></textarea>
+                        </div>
 
-                    <label>Skills:
-                        <select id="skills" multiple required disabled>
-                            <!-- Need to add more skills here-->
-                            <option value="html">HTML</option>
-                            <option value="css">CSS</option>
-                            <option value="javascript">JS</option>
-                        </select>
-                    </label><br><br>
+                        <div class="mb-3">
+                            <label for="availability" class="form-label">Availability</label>
+                            <input type="date" class="form-control" id="availability" required readonly>
+                        </div>
 
-                    <label>Preferences:
-                        <textarea id="preferences" readonly></textarea>
-                    </label><br><br><br>
-
-                    <label>Availability:
-                        <input type="date" id="availability" required readonly>
-                    </label><br><br>
-
-                    <button type="button" id="editButton">Edit</button>
-                    <button type="submit" id="saveButton" style="display:none">Save</button>
-                </form>
-                `;
-            //Testing purposes (Edit when Database is added, breaks after single use, reload page to try again)
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-primary" id="editButton">Edit</button>
+                            <button type="submit" class="btn btn-success" id="saveButton" style="display:none">Save</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            //Testing purposes
             let userData = {
                 fullName: "Placeholder Name",
                 address1: "123 Street St",
@@ -254,7 +265,7 @@ const routes = [
                 inputState.disabled = false;
                 inputSkills.disabled = false;
                 btnEdit.style.display = 'none';
-                btnSave.style.display = 'inline';
+                btnSave.style.display = 'inline-block';
             }
 
             function saveProfile(event) {
@@ -276,7 +287,7 @@ const routes = [
                 formElements.forEach(el => el.setAttribute('readonly', true));
                 inputState.disabled = true;
                 inputSkills.disabled = true;
-                btnEdit.style.display = 'inline';
+                btnEdit.style.display = 'inline-block';
                 btnSave.style.display = 'none';
             }
 
@@ -579,9 +590,7 @@ const routes = [
         ];
 
         page.innerHTML = /*html*/`
-            <h2>Volunteer History</h
-
-2>
+            <h2>Volunteer History</h2>
             <table class="table table-striped">
                 <thead>
                     <tr>
