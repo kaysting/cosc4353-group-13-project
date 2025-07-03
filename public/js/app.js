@@ -99,16 +99,16 @@ const routes = [
             page.innerHTML = /*html*/`
                 <h2>Login</h2>
                 <form id="loginForm">
-                    <div>
-                    <label for="loginEmail">Email:</label>
-                    <input type="email" id="loginEmail" required />
+                    <div class="form-group mb-3">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" class="form-control" placeholder="Enter your email" required>
                     </div>
-                    <div>
-                    <label for="loginPassword">Password:</label>
-                    <input type="password" id="loginPassword" required />
+                    <div class="form-group mb-3">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" class="form-control" placeholder="Enter your password" required>
                     </div>
-                    <button type="submit">Login</button>
-                    <p id="loginMessage" style="color:red;"></p>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                    <p id="loginMessage" class="mt-2" style="color:red;"></p>
                 </form>
             `;
 
@@ -512,19 +512,19 @@ const routes = [
         }
     },
 
-   {
-    path: '/notifications',
-    handler: () => {
-        const page = document.createElement('div');
+    {
+        path: '/notifications',
+        handler: () => {
+            const page = document.createElement('div');
 
-        // Updated mock notification data with type and date
-        const mockNotifications = [
-            { id: 1, message: "You have been assigned to Community Cleanup on 2025-07-01", type: "assignment", date: "2025-06-30" },
-            { id: 2, message: "Reminder: Food Drive event tomorrow at 9 AM", type: "reminder", date: "2025-07-01" },
-            { id: 3, message: "Event Community Cleanup updated: New location", type: "update", date: "2025-06-29" },
-        ];
+            // Updated mock notification data with type and date
+            const mockNotifications = [
+                { id: 1, message: "You have been assigned to Community Cleanup on 2025-07-01", type: "assignment", date: "2025-06-30" },
+                { id: 2, message: "Reminder: Food Drive event tomorrow at 9 AM", type: "reminder", date: "2025-07-01" },
+                { id: 3, message: "Event Community Cleanup updated: New location", type: "update", date: "2025-06-29" },
+            ];
 
-        page.innerHTML = /*html*/`
+            page.innerHTML = /*html*/`
             <h2>Notifications</h2>
             <div id="notificationList">
                 ${mockNotifications.length === 0 ? '<p>No notifications available.</p>' : ''}
@@ -540,23 +540,23 @@ const routes = [
             </div>
         `;
 
-        // Add dismiss button functionality
-        page.querySelectorAll('.dismiss-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const id = button.getAttribute('data-id');
-                button.parentElement.remove();
-                // Update mockNotifications (in a real app, this would update a database)
-                const updatedNotifications = mockNotifications.filter(n => n.id !== parseInt(id));
-                // Note: Update mockNotifications in a real app
-                if (page.querySelectorAll('.list-group-item').length === 0) {
-                    page.querySelector('#notificationList').innerHTML = '<p>No notifications available.</p>';
-                }
+            // Add dismiss button functionality
+            page.querySelectorAll('.dismiss-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const id = button.getAttribute('data-id');
+                    button.parentElement.remove();
+                    // Update mockNotifications (in a real app, this would update a database)
+                    const updatedNotifications = mockNotifications.filter(n => n.id !== parseInt(id));
+                    // Note: Update mockNotifications in a real app
+                    if (page.querySelectorAll('.list-group-item').length === 0) {
+                        page.querySelector('#notificationList').innerHTML = '<p>No notifications available.</p>';
+                    }
+                });
             });
-        });
 
-        render(page);
-    }
-},
+            render(page);
+        }
+    },
 
     // Activity page displaying event and volunteer activity history
     {
