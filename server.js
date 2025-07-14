@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const config = require('./config.json');
 
 // Map user IDs to user info
 const users = {};
@@ -77,7 +78,6 @@ app.use((req, res) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
+app.listen(config.server_port, () => {
+    console.log(`Server is running at http://localhost:${config.server_port}`);
 });
