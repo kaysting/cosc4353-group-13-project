@@ -15,6 +15,9 @@ const users = {};
 // Map session tokens to user IDs
 const sessions = {};
 
+// Map event IDs to event details
+const events = {};
+
 // Use Express' built-in JSON parser
 app.use(express.json());
 
@@ -74,10 +77,24 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
+    // check password, create and save token
 });
 
 // Middleware to check for valid session token and error out if not valid or present
 const requireLogin = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) {
+        return res.sendApiError(401, 'missing_token', 'Authorization token is required');
+    }
+    const userId = sessions[token];
+    if (!userId) {
+        return res.sendApiError(401, 'invalid_token', 'Authorization token is invalid or expired');
+    }
+    req.userId = userId;
+    req.user = users[userId];
+    if (!req.user) {
+        return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
+    }
     next();
 };
 
