@@ -26,11 +26,6 @@ const routes = [
                 <h2>Register</h2>
                 <form>
                     <div class="form-group mb-3">
-                        <label for="registerName">Name</label>
-                        <input type="text" id="registerName" class="form-control" placeholder="What should we call you?" required>
-                        <small class="form-text text-muted">This is the name that volunteering coordinators will see.</small>
-                    </div>
-                    <div class="form-group mb-3">
                         <label for="registerEmail">Email</label>
                         <input type="email" id="registerEmail" class="form-control" placeholder="Enter your email" required>
                         <small class="form-text text-muted">We'll send volunteering notifications to this address.</small>
@@ -45,18 +40,9 @@ const routes = [
                     </div>
                 </form>
             `;
-            const inputName = page.querySelector('#registerName');
             const inputEmail = page.querySelector('#registerEmail');
             const inputPassword = page.querySelector('#registerPassword');
             const btnSubmit = page.querySelector('#registerSubmit');
-            // Name must be between 3 and 50 characters
-            inputName.addEventListener('input', () => {
-                if (inputName.value.length < 3 || inputName.value.length > 50) {
-                    inputName.setCustomValidity('Name must be between 3 and 50 characters');
-                } else {
-                    inputName.setCustomValidity('');
-                }
-            });
             // Email must be a valid email address
             inputEmail.addEventListener('input', () => {
                 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -77,9 +63,8 @@ const routes = [
             // Handle submit
             btnSubmit.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (!inputName.checkValidity() || !inputEmail.checkValidity() || !inputPassword.checkValidity()) return;
+                if (!inputEmail.checkValidity() || !inputPassword.checkValidity()) return;
 
-                const name = inputName.value.trim();
                 const email = inputEmail.value.trim();
                 const password = inputPassword.value;
 
@@ -675,3 +660,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+for (const anchor of anchors) {
+    const href = anchor.getAttribute('href');
+    if (href && href.startsWith('/') && !href.startsWith('//')) {
+        anchor.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigate(href);
+        });
+    }
+}
