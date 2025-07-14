@@ -3,10 +3,17 @@ const app = express();
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
+// Map user IDs to user info
+const users = {};
+
+// Map session tokens to user IDs
+const sessions = {};
+
 // Use Express' built-in JSON parser
 app.use(express.json());
 
 // Create new account
+// Accounts should be stored in an in-memory object for now
 app.post('/api/auth/register', (req, res) => {
     const name = req.body.name;
     const email = req.body.email;
@@ -14,13 +21,14 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // Log into account with username/email and password, returns a session token
+// Sessions should be stored in an in-memory object for now
 app.post('/api/auth/login', (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
 });
 
+// Middleware to check for valid session token and error out if not valid or present
 const requireLogin = (req, res, next) => {
-    // Middleware to check for valid session token and error out if not present
     next();
 };
 
