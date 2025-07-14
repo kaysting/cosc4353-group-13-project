@@ -47,6 +47,9 @@ app.post('/api/profile/events', requireLogin, (req, res) => { });
 // Get all events (admin only)
 app.get('/api/events', requireLogin, (req, res) => { });
 
+// Get a single event (admin only)
+app.get('/api/events/event', requireLogin, (req, res) => { });
+
 // Create new event (admin only)
 app.post('/api/events/create', requireLogin, (req, res) => { });
 
