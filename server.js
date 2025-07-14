@@ -1,47 +1,61 @@
 const express = require('express');
 const app = express();
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 
 // Use Express' built-in JSON parser
 app.use(express.json());
 
 // Create new account
-app.post('/api/auth/register', (req, res) => { });
+app.post('/api/auth/register', (req, res) => {
+    const name = req.body.name;
+    const email = req.body.email;
+    const password = req.body.password;
+});
 
 // Log into account with username/email and password, returns a session token
-app.post('/api/auth/login', (req, res) => { });
+app.post('/api/auth/login', (req, res) => {
+    const email = req.body.email;
+    const password = req.body.password;
+});
+
+const requireLogin = (req, res, next) => {
+    // Middleware to check for valid session token and error out if not present
+    next();
+};
 
 // Log out and delete the current session token
-app.post('/api/auth/logout', (req, res) => { });
+app.post('/api/auth/logout', requireLogin, (req, res) => { });
 
 // Get current user profile info
-app.get('/api/profile', (req, res) => { });
+app.get('/api/profile', requireLogin, (req, res) => { });
 
 // Update current user profile info
-app.post('/api/profile/update', (req, res) => { });
+app.post('/api/profile/update', requireLogin, (req, res) => { });
 
 // Get events assigned to the current user
-app.post('/api/profile/events', (req, res) => { });
+app.post('/api/profile/events', requireLogin, (req, res) => { });
 
 // Get all events (admin only)
-app.get('/api/events', (req, res) => { });
+app.get('/api/events', requireLogin, (req, res) => { });
 
 // Create new event (admin only)
-app.post('/api/events/create', (req, res) => { });
+app.post('/api/events/create', requireLogin, (req, res) => { });
 
 // Update existing event info (admin only)
-app.post('/api/events/update', (req, res) => { });
+app.post('/api/events/update', requireLogin, (req, res) => { });
 
 // Get volunteers that are available for a certain event (admin only)
-app.get('/api/events/match/check', (req, res) => { });
+app.get('/api/events/match/check', requireLogin, (req, res) => { });
 
 // Assign a volunteer to an event (admin only)
-app.post('/api/events/match/assign', (req, res) => { });
+app.post('/api/events/match/assign', requireLogin, (req, res) => { });
 
 // Get notifications for the current user
-app.get('/api/notifications', (req, res) => { });
+app.get('/api/notifications', requireLogin, (req, res) => { });
 
 // Get volunteer history (maybe admin only?)
-app.get('/api/history', (req, res) => { });
+app.get('/api/history', requireLogin, (req, res) => { });
 
 // Serve static files from the public directory
 app.use(express.static('public'));
