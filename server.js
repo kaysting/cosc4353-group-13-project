@@ -134,6 +134,70 @@ app.get('/api/notifications', requireLogin, (req, res) => { });
 // Get volunteer history (maybe admin only?)
 app.get('/api/history', requireLogin, (req, res) => { });
 
+// ------------------ Volunteer Matching, Notifications, History ------------------
+
+// In-memory maps
+const notifications = {};
+const volunteerHistory = {};
+
+// Volunteer Matching Endpoint
+app.post('/api/volunteer/match', requireLogin, (req, res) => {
+    const { eventId } = req.body;
+    const event = events[eventId];
+    if (!event) return res.sendApiError(404, 'event_not_found', 'Event not found');
+
+    const matchedVolunteers = Object.entries(users).filter(([userId, user]) => {
+        const profile = user.profile;
+        if (!profile.skills || !profile.city || !profile.availability_dates) return false;
+
+        const hasSkills = event.requiredSkills.every(skill => profile.skills.includes(skill));
+        const locationMatch = profile.city === event.city;
+        const isAvailable = profile.availability_dates.includes(event.date);
+
+        return hasSkills && locationMatch && isAvailable;
+    }).map(([userId]) => userId);
+
+    res.sendApiOkay({ matchedVolunteers });
+});
+
+// Notification System
+app.post('/api/notifications/send', requireLogin, (req, res) => {
+    const { userId, message } = req.body;
+    if (!users[userId]) return res.sendApiError(404, 'user_not_found', 'User not found');
+
+    if (!notifications[userId]) notifications[userId] = [];
+    notifications[userId].push({ message, date: new Date() });
+
+    res.sendApiOkay({ message: 'Notification sent' });
+});
+
+app.get('/api/notifications/:userId', requireLogin, (req, res) => {
+    const userId = req.params.userId;
+    if (!users[userId]) return res.sendApiError(404, 'user_not_found', 'User not found');
+
+    res.sendApiOkay({ notifications: notifications[userId] || [] });
+});
+
+// Volunteer History
+app.post('/api/history/add', requireLogin, (req, res) => {
+    const { userId, eventId } = req.body;
+    if (!users[userId] || !events[eventId]) return res.sendApiError(404, 'user_or_event_not_found', 'User or event not found');
+
+    if (!volunteerHistory[userId]) volunteerHistory[userId] = [];
+    volunteerHistory[userId].push({ eventId, date: new Date() });
+
+    res.sendApiOkay({ message: 'History updated' });
+});
+
+app.get('/api/history/:userId', requireLogin, (req, res) => {
+    const userId = req.params.userId;
+    if (!users[userId]) return res.sendApiError(404, 'user_not_found', 'User not found');
+
+    res.sendApiOkay({ history: volunteerHistory[userId] || [] });
+});
+
+// ------------------ End of Volunteer Matching, Notifications, History ------------------
+
 // Catch-all route to serve the index.html file for any unmatched routes
 app.use((req, res) => {
     res.sendFile(__dirname + '/public/index.html');
