@@ -102,10 +102,42 @@ const requireLogin = (req, res, next) => {
 app.post('/api/auth/logout', requireLogin, (req, res) => { });
 
 // Get current user profile info
-app.get('/api/profile', requireLogin, (req, res) => { });
+app.get('/api/profile', requireLogin, (req, res) => {
+    const profile = req.user.profile;
+    res.sendApiOkay({ profile });
+ });
 
 // Update current user profile info
-app.post('/api/profile/update', requireLogin, (req, res) => { });
+app.post('/api/profile/update', requireLogin, (req, res) => {
+    const {
+        name,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        zip,
+        skills,
+        preference,
+        availability_dates,
+    } = req.body;
+    //Make sure zip code is of 5 char length 
+    if (zip && !/^\d{5}$/.test(zip)){
+        return res.sendApiError(400, 'invalid_zip', 'Zip code must be 5 digits');
+    }
+    //Update the User Profile
+    req.user.profile = {
+        name,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        zip,
+        skills: Array.isArray(skills) ? skills : [],
+        preference,
+        availability_dates: Array.isArray(availability_dates) ? availability_dates : []
+    };
+    res.sendApiOkay({ message: 'Profile updated successfully!' });
+ });
 
 // Get events assigned to the current user
 app.post('/api/profile/events', requireLogin, (req, res) => { });
