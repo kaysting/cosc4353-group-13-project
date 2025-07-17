@@ -18,6 +18,7 @@ const sessions = {};
 const events = {};
 const notifications = {};
 const volunteerHistory = {};
+const eventAssignments = {};
 
 // Function to send notifications to users
 // Stores notifications in the database and sends an email
@@ -176,73 +177,110 @@ app.post('/api/events/create', requireLogin, (req, res) => { });
 app.post('/api/events/update', requireLogin, (req, res) => { });
 
 // Get volunteers that are available for a certain event (admin only)
-app.get('/api/events/match/check', requireLogin, (req, res) => { });
+app.get('/api/events/match/check', requireLogin, (req, res) => {
+    const eventId = req.query.eventId;
+    const event = events[eventId];
+    
+    if (!event) {
+        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    }
+    
+    const matchingVolunteers = [];
+    
+    for (const userId in users) {
+        const user = users[userId];
+        const profile = user.profile;
+        
+        if (eventAssignments[eventId] && eventAssignments[eventId].includes(userId)) {
+            continue;
+        }
+        
+        const hasRequiredSkills = event.requiredSkills.some(skill => 
+            profile.skills.includes(skill)
+        );
+        
+        const isAvailable = profile.availability_dates.includes(event.date);
+        
+        const locationMatch = profile.city && profile.state && 
+            event.location.includes(profile.city) && 
+            event.location.includes(profile.state);
+        
+        if (hasRequiredSkills && isAvailable && locationMatch) {
+            matchingVolunteers.push({
+                userId: userId,
+                name: profile.name || user.email,
+                email: user.email,
+                skills: profile.skills,
+                location: `${profile.city}, ${profile.state}`
+            });
+        }
+    }
+    
+    res.sendApiOkay({ volunteers: matchingVolunteers });
+});
 
 // Assign a volunteer to an event (admin only)
-app.post('/api/events/match/assign', requireLogin, (req, res) => { });
+app.post('/api/events/match/assign', requireLogin, (req, res) => {
+    const { eventId, volunteerId } = req.body;
+    
+    if (!volunteerId) {
+        return res.sendApiError(400, 'missing_volunteer', 'Volunteer ID is required');
+    }
+    
+    const event = events[eventId];
+    if (!event) {
+        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    }
+    
+    const volunteer = users[volunteerId];
+    if (!volunteer) {
+        return res.sendApiError(404, 'volunteer_not_found', 'Volunteer not found');
+    }
+    
+    if (!eventAssignments[eventId]) {
+        eventAssignments[eventId] = [];
+    }
+    
+    if (eventAssignments[eventId].includes(volunteerId)) {
+        return res.sendApiError(400, 'already_assigned', 'Volunteer is already assigned to this event');
+    }
+    
+    eventAssignments[eventId].push(volunteerId);
+    
+    // Send notification to volunteer about assignment
+    sendNotification(volunteerId, {
+        type: 'assignment',
+        message: `You have been assigned to "${event.name}" on ${event.date}`,
+        eventId: eventId,
+        date: new Date().toISOString()
+    });
+    
+    // Add to volunteer history
+    addToHistory(volunteerId, {
+        eventId: eventId,
+        eventName: event.name,
+        description: event.description,
+        location: event.location,
+        requiredSkills: event.requiredSkills,
+        urgency: event.urgency,
+        date: event.date,
+        status: 'Assigned'
+    });
+    
+    res.sendApiOkay({ message: 'Volunteer assigned successfully' });
+});
 
 // Get notifications for the current user
-app.get('/api/notifications', requireLogin, (req, res) => { });
+app.get('/api/notifications', requireLogin, (req, res) => {
+    const userNotifications = notifications[req.userId] || [];
+    res.sendApiOkay({ notifications: userNotifications });
+});
 
 // Get volunteer history (maybe admin only?)
-app.get('/api/history', requireLogin, (req, res) => { });
-
-// Volunteer Matching Endpoint
-app.post('/api/volunteer/match', requireLogin, (req, res) => {
-    const { eventId } = req.body;
-    const event = events[eventId];
-    if (!event) return res.sendApiError(404, 'event_not_found', 'Event not found');
-
-    const matchedVolunteers = Object.entries(users).filter(([userId, user]) => {
-        const profile = user.profile;
-        if (!profile.skills || !profile.city || !profile.availability_dates) return false;
-
-        const hasSkills = event.requiredSkills.every(skill => profile.skills.includes(skill));
-        const locationMatch = profile.city === event.city;
-        const isAvailable = profile.availability_dates.includes(event.date);
-
-        return hasSkills && locationMatch && isAvailable;
-    }).map(([userId]) => userId);
-
-    res.sendApiOkay({ matchedVolunteers });
+app.get('/api/history', requireLogin, (req, res) => {
+    const history = volunteerHistory[req.userId] || [];
+    res.sendApiOkay({ history });
 });
-
-// Notification System
-app.post('/api/notifications/send', requireLogin, (req, res) => {
-    const { userId, message } = req.body;
-    if (!users[userId]) return res.sendApiError(404, 'user_not_found', 'User not found');
-
-    if (!notifications[userId]) notifications[userId] = [];
-    notifications[userId].push({ message, date: new Date() });
-
-    res.sendApiOkay({ message: 'Notification sent' });
-});
-
-app.get('/api/notifications/:userId', requireLogin, (req, res) => {
-    const userId = req.params.userId;
-    if (!users[userId]) return res.sendApiError(404, 'user_not_found', 'User not found');
-
-    res.sendApiOkay({ notifications: notifications[userId] || [] });
-});
-
-// Volunteer History
-app.post('/api/history/add', requireLogin, (req, res) => {
-    const { userId, eventId } = req.body;
-    if (!users[userId] || !events[eventId]) return res.sendApiError(404, 'user_or_event_not_found', 'User or event not found');
-
-    if (!volunteerHistory[userId]) volunteerHistory[userId] = [];
-    volunteerHistory[userId].push({ eventId, date: new Date() });
-
-    res.sendApiOkay({ message: 'History updated' });
-});
-
-app.get('/api/history/:userId', requireLogin, (req, res) => {
-    const userId = req.params.userId;
-    if (!users[userId]) return res.sendApiError(404, 'user_not_found', 'User not found');
-
-    res.sendApiOkay({ history: volunteerHistory[userId] || [] });
-});
-
 // Catch-all route to serve the index.html file for any unmatched routes
 app.use((req, res) => {
     res.sendFile(__dirname + '/public/index.html');
