@@ -9,14 +9,26 @@ const isEmailValid = email => {
     return emailRegex.test(email);
 };
 
-// Map user IDs to user info
+const isZipValid = zip => /^\d{5}$/.test(zip);
+const isDateValid = date => !isNaN(Date.parse(date));
+
+// In-memory data maps to act as database for now
 const users = {};
-
-// Map session tokens to user IDs
 const sessions = {};
-
-// Map event IDs to event details
 const events = {};
+const notifications = {};
+const volunteerHistory = {};
+
+// Function to send notifications to users
+// Stores notifications in the database and sends an email
+const sendNotification = (userId, message) => {
+    // ...
+};
+
+// Function to add a volunteer history entry
+const addVolunteerHistory = (userId, eventId) => {
+    // ...
+};
 
 // Use Express' built-in JSON parser
 app.use(express.json());
@@ -56,11 +68,13 @@ app.post('/api/auth/register', async (req, res) => {
     const userId = crypto.randomUUID();
     const passwordHash = await bcrypt.hash(password, 10);
     users[userId] = {
-        email, passwordHash,
+        email, password_hash: passwordHash,
+        is_email_verified: false,
+        is_admin: false,
         profile: {
             name: '',
-            addressLine1: '',
-            addressLine2: '',
+            address_line1: '',
+            address_line2: '',
             city: '',
             state: '',
             zip: '',
@@ -73,7 +87,6 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Log into account with username/email and password, returns a session token
-// Sessions should be stored in an in-memory object for now
 app.post('/api/auth/login', (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
@@ -105,30 +118,38 @@ app.post('/api/auth/logout', requireLogin, (req, res) => { });
 app.get('/api/profile', requireLogin, (req, res) => {
     const profile = req.user.profile;
     res.sendApiOkay({ profile });
- });
+});
 
 // Update current user profile info
 app.post('/api/profile/update', requireLogin, (req, res) => {
     const {
         name,
-        addressLine1,
-        addressLine2,
+        address_line1,
+        address_line2,
         city,
         state,
         zip,
         skills,
         preference,
-        availability_dates,
+        availability_dates
     } = req.body;
     //Make sure zip code is of 5 char length 
-    if (zip && !/^\d{5}$/.test(zip)){
+    if (zip && !isZipValid(zip)) {
         return res.sendApiError(400, 'invalid_zip', 'Zip code must be 5 digits');
+    }
+    // Validate all availability_dates
+    if (availability_dates && Array.isArray(availability_dates)) {
+        for (const date of availability_dates) {
+            if (!isDateValid(date)) {
+                return res.sendApiError(400, 'invalid_date', `Invalid date in availability_dates: ${date}`);
+            }
+        }
     }
     //Update the User Profile
     req.user.profile = {
         name,
-        addressLine1,
-        addressLine2,
+        address_line1,
+        address_line2,
         city,
         state,
         zip,
@@ -137,7 +158,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         availability_dates: Array.isArray(availability_dates) ? availability_dates : []
     };
     res.sendApiOkay({ message: 'Profile updated successfully!' });
- });
+});
 
 // Get events assigned to the current user
 app.post('/api/profile/events', requireLogin, (req, res) => { });
@@ -165,12 +186,6 @@ app.get('/api/notifications', requireLogin, (req, res) => { });
 
 // Get volunteer history (maybe admin only?)
 app.get('/api/history', requireLogin, (req, res) => { });
-
-// ------------------ Volunteer Matching, Notifications, History ------------------
-
-// In-memory maps
-const notifications = {};
-const volunteerHistory = {};
 
 // Volunteer Matching Endpoint
 app.post('/api/volunteer/match', requireLogin, (req, res) => {
@@ -227,8 +242,6 @@ app.get('/api/history/:userId', requireLogin, (req, res) => {
 
     res.sendApiOkay({ history: volunteerHistory[userId] || [] });
 });
-
-// ------------------ End of Volunteer Matching, Notifications, History ------------------
 
 // Catch-all route to serve the index.html file for any unmatched routes
 app.use((req, res) => {

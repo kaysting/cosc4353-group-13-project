@@ -61,16 +61,45 @@ const routes = [
                 }
             });
             // Handle submit
-            btnSubmit.addEventListener('click', (e) => {
+            btnSubmit.addEventListener('click', async (e) => {
                 e.preventDefault();
                 if (!inputEmail.checkValidity() || !inputPassword.checkValidity()) return;
 
                 const email = inputEmail.value.trim();
                 const password = inputPassword.value;
 
-                // TODO: Interface with server...
+                // Show a message area if not present
+                let msg = page.querySelector('#registerMessage');
+                if (!msg) {
+                    msg = document.createElement('div');
+                    msg.id = 'registerMessage';
+                    msg.className = 'mt-2';
+                    page.appendChild(msg);
+                }
+                msg.textContent = '';
+                msg.style.color = '';
 
-                window.location.hash = '/login';
+                try {
+                    const response = await fetch('/api/auth/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        msg.style.color = 'green';
+                        msg.textContent = 'Registration successful! Redirecting to login...';
+                        setTimeout(() => {
+                            window.location.hash = '/login';
+                        }, 1200);
+                    } else {
+                        msg.style.color = 'red';
+                        msg.textContent = data.message || 'Registration failed.';
+                    }
+                } catch (err) {
+                    msg.style.color = 'red';
+                    msg.textContent = 'Network error. Please try again.';
+                }
             });
             render(page);
         }
