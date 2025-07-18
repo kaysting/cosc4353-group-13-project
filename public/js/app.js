@@ -537,7 +537,48 @@ const routes = [
             renderEventForm('edit', params.eventId);
         }
     },
+    
 
+    // Admin: List all events to edit
+    {
+    path: '/admin/events',
+    handler: async () => {
+        const page = document.createElement('div');
+        page.innerHTML = `<h2>All Events</h2><div id="eventList"></div>`;
+
+        const eventListDiv = page.querySelector('#eventList');
+        const response = await api.events.getAll();
+
+        if (!response.success) {
+        eventListDiv.innerHTML = `<p class="text-danger">Error loading events: ${response.message}</p>`;
+        } else if (response.events.length === 0) {
+        eventListDiv.innerHTML = `<p>No events found.</p>`;
+        } else {
+        const list = document.createElement('ul');
+        list.className = 'list-group';
+
+        response.events.forEach(event => {
+            const item = document.createElement('li');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            item.textContent = `${event.name} (${event.date})`;
+
+            const editLink = document.createElement('a');
+            editLink.href = `/admin/events/${event.id}`;
+            editLink.textContent = 'Edit';
+            editLink.className = 'btn btn-sm btn-primary';
+
+            item.appendChild(editLink);
+            list.appendChild(item);
+        });
+
+        eventListDiv.appendChild(list);
+        }
+
+        render(page);
+    }
+    },
+
+    /*
     // Admin: List all events to edit
     {
     path: '/admin/events',
@@ -564,6 +605,7 @@ const routes = [
         render(page);
     }
     },
+    */
 
     // Admin event volunteer matching page
     {
