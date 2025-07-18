@@ -427,24 +427,16 @@ const routes = [
                     date: document.getElementById('eventDate').value
                 };
 
-                const token = localStorage.getItem('token'); // Using 'token' which you're storing manually for now
-
-                if (!token) {
-                    alert('Authorization token missing. Please login first.');
-                    return;
-                }
-
                 try {
-                    const response = await axios.post('/api/events/create', formData, {
-                        headers: {
-                            Authorization: `Bearer ${token}`
-                        }
-                    });
-
-                    alert('Event created successfully!');
-                    console.log(response.data);
+                    const response = await api.events.create(formData);
+                    if (response.success) {
+                        alert('Event created successfully!');
+                        console.log(response.event); // newly created event object
+                    } else {
+                        alert('Error creating event: ' + (response.message || 'Unknown error'));
+                    }
                 } catch (err) {
-                    alert('Error creating event: ' + (err.response?.data?.message || err.message));
+                    alert('Unexpected error: ' + err.message);
                     console.error(err);
                 }
             });
