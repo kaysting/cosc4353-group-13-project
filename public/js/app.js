@@ -1,5 +1,3 @@
-import api from './api.js';
-
 const elPageContainer = document.getElementById('page');
 
 function render(elPageContent) {
@@ -38,13 +36,21 @@ const routes = [
                         <small class="form-text text-muted">Your password must be at least 8 characters long.</small>
                     </div>
                     <div class="form-group mb-3">
+                        <label for="registerRepeatPassword">Repeat Password</label>
+                        <input type="password" id="registerRepeatPassword" class="form-control" placeholder="Repeat your password" required>
+                        <small class="form-text text-muted">Please re-enter your password.</small>
+                    </div>
+                    <div class="form-group mb-3">
                         <button id="registerSubmit" type="submit" class="btn btn-primary">Register</button>
                     </div>
+                    <div id="registerError" class="text-danger mt-2" style="display:none"></div>
                 </form>
             `;
             const inputEmail = page.querySelector('#registerEmail');
             const inputPassword = page.querySelector('#registerPassword');
+            const inputRepeatPassword = page.querySelector('#registerRepeatPassword');
             const btnSubmit = page.querySelector('#registerSubmit');
+            const errorDiv = page.querySelector('#registerError');
             // Email must be a valid email address
             inputEmail.addEventListener('input', () => {
                 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,15 +67,43 @@ const routes = [
                 } else {
                     inputPassword.setCustomValidity('');
                 }
+                // Also check repeat password
+                if (inputRepeatPassword.value && inputRepeatPassword.value !== inputPassword.value) {
+                    inputRepeatPassword.setCustomValidity('Passwords do not match');
+                } else {
+                    inputRepeatPassword.setCustomValidity('');
+                }
+            });
+            // Repeat password must match password
+            inputRepeatPassword.addEventListener('input', () => {
+                if (inputRepeatPassword.value !== inputPassword.value) {
+                    inputRepeatPassword.setCustomValidity('Passwords do not match');
+                } else {
+                    inputRepeatPassword.setCustomValidity('');
+                }
             });
             // Handle submit
             btnSubmit.addEventListener('click', async (e) => {
                 e.preventDefault();
-                if (!inputEmail.checkValidity() || !inputPassword.checkValidity()) return;
-
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+                if (!inputEmail.checkValidity()) {
+                    errorDiv.textContent = inputEmail.validationMessage;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                if (!inputPassword.checkValidity()) {
+                    errorDiv.textContent = inputPassword.validationMessage;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                if (!inputRepeatPassword.checkValidity()) {
+                    errorDiv.textContent = inputRepeatPassword.validationMessage;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
                 const email = inputEmail.value.trim();
                 const password = inputPassword.value;
-
                 // Show a message area if not present
                 let msg = page.querySelector('#registerMessage');
                 if (!msg) {
@@ -80,7 +114,6 @@ const routes = [
                 }
                 msg.textContent = '';
                 msg.style.color = '';
-
                 const data = await api.auth.register(email, password);
                 if (data.success === false) {
                     msg.style.color = 'red';
@@ -95,6 +128,11 @@ const routes = [
             });
             render(page);
         }
+    },
+
+    // Email verification form
+    {
+
     },
 
     // User login form

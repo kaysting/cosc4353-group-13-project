@@ -47,6 +47,7 @@ const events = {};
 const notifications = {};
 const volunteerHistory = {};
 const eventAssignments = {};
+const emailVerificationCodes = {};
 
 // Function to send notifications to users
 // Stores notifications in the database and sends an email
