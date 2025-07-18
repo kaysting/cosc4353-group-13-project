@@ -17,7 +17,7 @@ const isEmailValid = email => {
     return emailRegex.test(email);
 };
 
-const isZipValid = zip => /^\d{5}$/.test(zip);
+const isZipValid = zipCode => /^\d{5}$/.test(zipCode);
 const isDateValid = date => !isNaN(Date.parse(date));
 
 const randomString = (length, charset = 'base64') => {
@@ -63,8 +63,8 @@ function normalizeProfile(profile) {
         zipCode: profile.zipCode || '',
         skills: Array.isArray(profile.skills) ? profile.skills : [],
         preferences: profile.preferences || '',
-        availabilityStart: profile.availabilityStart ? new Date(profile.availabilityStart).toISOString().split('T')[0] : '',
-        availabilityEnd: profile.availabilityEnd ? new Date(profile.availabilityEnd).toISOString().split('T')[0] : ''
+        availability_dates: (profile.availabilityStart && profile.availabilityEnd) ? 
+            [new Date(profile.availabilityStart).toISOString(), new Date(profile.availabilityEnd).toISOString()] : []
     };
 }
 
@@ -337,7 +337,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         availabilityEnd
     } = req.body;
     //Make sure zip code is of 5 char length 
-    if (zip && !isZipValid(zip)) {
+    if (zipCode && !isZipValid(zipCode)) {
         return res.sendApiError(400, 'invalid_zip', 'Zip code must be 5 digits');
     }
     // Validate all availability_dates
