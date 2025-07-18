@@ -156,36 +156,28 @@ const routes = [
                     <p id="loginMessage" class="mt-2" style="color:red;"></p>
                 </form>
             `;
-
+            const inputEmail = page.querySelector('#loginEmail');
+            const inputPassword = page.querySelector('#loginPassword');
+            const loginMessage = page.querySelector('#loginMessage');
             // submit event listener to the login form
-            page.querySelector('#loginForm').addEventListener('submit', function (e) {
-                // Prevent the form from submitting the default way
+            page.querySelector('#loginForm').addEventListener('submit', async function (e) {
                 e.preventDefault();
-
-                // values entered in the email and password fields
-                const email = page.querySelector('#loginEmail').value.trim(); // removes any leading/trailing spaces
-                const password = page.querySelector('#loginPassword').value;
-
-                // list of registered users from localStorage
-                const users = JSON.parse(localStorage.getItem('users') || '[]');
-
-                // find a user whose email and password match the input
-                const user = users.find(u => u.email === email && u.password === password);
-
-                // message (to display success/failure messages)
-                const message = page.querySelector('#loginMessage');
-
-                if (user) {
-                    // If a matching user is found
+                const email = inputEmail.value.trim();
+                const password = inputPassword.value;
+                const message = loginMessage;
+                loginMessage.textContent = '';
+                message.style.color = '';
+                // Call API for login
+                const data = await api.auth.login(email, password);
+                if (data.success) {
                     message.style.color = 'green';
                     message.textContent = 'Login successful! Redirecting...';
-
                     setTimeout(() => {
                         navigate('/profile');
                     }, 1000);
                 } else {
                     message.style.color = 'red';
-                    message.textContent = 'Invalid email or password';
+                    message.textContent = data.message;
                 }
             });
             render(page);
@@ -265,11 +257,11 @@ const routes = [
                 </div>
             `;
 
-            //Check if a token exists
+            // Check if a token exists
             const token = localStorage.getItem('token');
             if (!token) {
                 alert("Please log in first.");
-                navigate('/login');
+                return navigate('/login');
             }
             const inputFullName = page.querySelector('#fullName');
             const inputAddress1 = page.querySelector('#address1');
@@ -605,6 +597,7 @@ const routes = [
         }
     },
 
+    // Notifications page
     {
         path: '/notifications',
         handler: () => {

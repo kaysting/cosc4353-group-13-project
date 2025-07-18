@@ -1,4 +1,5 @@
 {
     "server_port": 8080,
-    "mailgun_api_key": ""
+    "mailgun_api_key": "",
+    "mailgun_domain": ""
 }

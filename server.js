@@ -2,7 +2,15 @@ const express = require('express');
 const app = express();
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const formData = require('form-data');
+const Mailgun = require('mailgun.js');
 const config = require('./config.json');
+
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({
+    username: 'api',
+    key: config.mailgun_api_key
+});
 
 const isEmailValid = email => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -11,6 +19,20 @@ const isEmailValid = email => {
 
 const isZipValid = zip => /^\d{5}$/.test(zip);
 const isDateValid = date => !isNaN(Date.parse(date));
+
+const randomString = (length, charset = 'base64') => {
+    let result = '';
+    if (charset == 'hex')
+        charset = '0123456789abcdef';
+    else if (charset == 'numeric')
+        charset = '0123456789';
+    else if (charset == 'base64')
+        charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    for (let i = 0; i < length; i++) {
+        result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return result;
+};
 
 const hashPassword = async (password) => {
     return bcrypt.hash(password, 10);
@@ -53,6 +75,17 @@ const emailVerificationCodes = {};
 // Stores notifications in the database and sends an email
 const sendNotification = (recipientId, header, description, time = Date.now()) => {
     // ...
+};
+
+const sendEmailVerification = async (email) => {
+    const code = randomString(6, 'numeric');
+    emailVerificationCodes[email] = code;
+    await mg.messages.create(config.mailgun_domain, {
+        from: `no-reply@${config.mailgun_domain}`,
+        to: email,
+        subject: 'Verify your email',
+        text: `Hi new volunteer!\n\nTo keep your account safe, please verify your email address by entering the code below on the website:\n\n${code}\n\nIf you did not create an account, please ignore this email.\n\nThanks!`
+    });
 };
 
 // Function to add a volunteer history entry
@@ -117,10 +150,30 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Log into account with username/email and password, returns a session token
-app.post('/api/auth/login', (req, res) => {
-    const email = req.body.email;
-    const password = req.body.password;
-    // check password, create and save token
+app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
+    if (!isEmailValid(email)) {
+        return res.sendApiError(400, 'invalid_email', 'Email address is not valid');
+    }
+    let userId = null;
+    let user = null;
+    for (const id in users) {
+        if (users[id].email.toLowerCase() === email.toLowerCase()) {
+            userId = id;
+            user = users[id];
+            break;
+        }
+    }
+    if (!user) {
+        return res.sendApiError(401, 'invalid_credentials', 'Invalid email or password');
+    }
+    const valid = await checkPassword(password, user.password_hash);
+    if (!valid) {
+        return res.sendApiError(401, 'invalid_credentials', 'Invalid email or password');
+    }
+    const token = randomString(64, 'base64');
+    sessions[token] = userId;
+    res.sendApiOkay({ token });
 });
 
 // Middleware to check for valid session token and error out if not valid or present
