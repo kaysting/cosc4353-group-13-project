@@ -90,7 +90,7 @@ const routes = [
                 msg.style.color = 'green';
                 msg.textContent = 'Registration successful! Redirecting to login...';
                 setTimeout(() => {
-                    window.location.hash = '/login';
+                    navigate('/login');
                 }, 1200);
             });
             render(page);
@@ -142,7 +142,7 @@ const routes = [
                     message.textContent = 'Login successful! Redirecting...';
 
                     setTimeout(() => {
-                        window.location.hash = '/profile'; // Removed hash sign - Kayla
+                        navigate('/profile');
                     }, 1000);
                 } else {
                     message.style.color = 'red';
