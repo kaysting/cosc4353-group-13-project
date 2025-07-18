@@ -374,13 +374,13 @@ const routes = [
         }
     },
 
-    // Admin event management/editor page
+    // Admin event creation page
     {
-        path: '/admin/events/:eventId',
-        handler: (params) => {
+        path: '/admin/events/create',
+        handler: () => {
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
-            <h2>Manage Event: ${params.eventId}</h2>
+            <h2>Create Event</h2>
             <form id="eventForm">
                 <div class="form-group mb-3">
                     <label for="eventName">Event Name</label>
@@ -527,6 +527,14 @@ const routes = [
 
                 selectedOptions.forEach(opt => opt.remove());
             });
+        }
+    },
+
+    // Admin event management/editor page
+    {
+        path: '/admin/events/:eventId',
+        handler: (params) => {
+
         }
     },
 

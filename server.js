@@ -277,7 +277,24 @@ app.post('/api/events/create', requireLogin, (req, res) => {
 });
 
 // Update existing event info (admin only)
-app.post('/api/events/update', requireLogin, (req, res) => { });
+app.post('/api/events/update', requireLogin, (req, res) => {
+    const { eventId, name, description, location, skills, urgency, date } = req.body;
+
+    const event = events[eventId];
+    if (!event) {
+        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    }
+
+    // Update event details
+    event.name = name;
+    event.description = description;
+    event.location = location;
+    event.skills = skills;
+    event.urgency = urgency;
+    event.date = date;
+
+    res.sendApiOkay({ event });
+});
 
 // Get volunteers that are available for a certain event (admin only)
 app.get('/api/events/match/check', requireLogin, (req, res) => {
