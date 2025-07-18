@@ -13,7 +13,25 @@ const isZipValid = zip => /^\d{5}$/.test(zip);
 const isDateValid = date => !isNaN(Date.parse(date));
 
 // In-memory data maps to act as database for now
-const users = {};
+const users = {
+    placeholderAdminUser: {
+        email: 'admin@example.com',
+        password_hash: await bcrypt.hash('adminpassword', 10),
+        is_email_verified: true,
+        is_admin: true,
+        profile: {
+            name: 'Admin User',
+            address_line1: '',
+            address_line2: '',
+            city: '',
+            state: '',
+            zip: '',
+            skills: [],
+            preference: '',
+            availability_dates: []
+        }
+    }
+};
 const sessions = {};
 const events = {};
 const notifications = {};
