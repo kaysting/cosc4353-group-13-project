@@ -17,7 +17,7 @@ const isEmailValid = email => {
     return emailRegex.test(email);
 };
 
-const isZipValid = zip => /^\d{5}$/.test(zip);
+const isZipValid = zipCode => /^\d{5}$/.test(zipCode);
 const isDateValid = date => !isNaN(Date.parse(date));
 
 const randomString = (length, charset = 'base64') => {
@@ -55,15 +55,16 @@ function normalizeUser(user) {
 // Helper to normalize user profile data
 function normalizeProfile(profile) {
     return {
-        name: profile.name || '',
-        address_line1: profile.address_line1 || '',
-        address_line2: profile.address_line2 || '',
+        fullName: profile.fullName || '',
+        address1: profile.address1 || '',
+        address2: profile.address2 || '',
         city: profile.city || '',
         state: profile.state || '',
-        zip: profile.zip || '',
+        zipCode: profile.zipCode || '',
         skills: Array.isArray(profile.skills) ? profile.skills : [],
-        preference: profile.preference || '',
-        availability_dates: Array.isArray(profile.availability_dates) ? profile.availability_dates.map(d => new Date(d).toISOString()) : []
+        preferences: profile.preferences || '',
+        availability_dates: (profile.availabilityStart && profile.availabilityEnd) ? 
+            [new Date(profile.availabilityStart).toISOString(), new Date(profile.availabilityEnd).toISOString()] : []
     };
 }
 
@@ -337,39 +338,42 @@ app.get('/api/profile', requireLogin, (req, res) => {
 // Update current user profile info
 app.post('/api/profile/update', requireLogin, (req, res) => {
     const {
-        name,
-        address_line1,
-        address_line2,
+        fullName,
+        address1,
+        address2,
         city,
         state,
-        zip,
+        zipCode,
         skills,
-        preference,
-        availability_dates
+        preferences,
+        availabilityStart,
+        availabilityEnd
     } = req.body;
     //Make sure zip code is of 5 char length 
-    if (zip && !isZipValid(zip)) {
+    if (zipCode && !isZipValid(zipCode)) {
         return res.sendApiError(400, 'invalid_zip', 'Zip code must be 5 digits');
     }
     // Validate all availability_dates
-    if (availability_dates && Array.isArray(availability_dates)) {
-        for (const date of availability_dates) {
-            if (!isDateValid(date)) {
-                return res.sendApiError(400, 'invalid_date', `Invalid date in availability_dates: ${date}`);
-            }
+    if (availabilityStart && availabilityEnd) {
+        if (!isDateValid(availabilityStart) || !isDateValid(availabilityEnd)) {
+            return res.sendApiError(400, 'invalid_date', 'Start or end date is invalid');
+        }
+        if (new Date(availabilityEnd) < new Date(availabilityStart)) {
+            return res.sendApiError(400, 'invalid_range','End date cannot be earlier than start date.');
         }
     }
     //Update the User Profile
     userProfiles[req.userId] = normalizeProfile({
-        name,
-        address_line1,
-        address_line2,
+        fullName,
+        address1,
+        address2,
         city,
         state,
-        zip,
+        zipCode,
         skills,
-        preference,
-        availability_dates
+        preferences,
+        availabilityStart,
+        availabilityEnd
     });
     res.sendApiOkay({ message: 'Profile updated successfully!' });
 });
@@ -501,7 +505,7 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
         if (hasRequiredSkills && isAvailable && locationMatch) {
             matchingVolunteers.push({
                 userId: userId,
-                name: profile.name || user.email,
+                name: profile.fullName || user.email, //this line was previously: 'name: profile.name || user.email,'
                 email: user.email,
                 skills: profile.skills,
                 location: `${profile.city}, ${profile.state}`

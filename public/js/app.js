@@ -312,8 +312,16 @@ const routes = [
                         </div>
 
                         <div class="mb-3">
-                            <label for="availability" class="form-label">Availability</label>
-                            <input type="date" class="form-control" id="availability" required readonly>
+                            <div class="row-g2">
+                                <div class="col">
+                                    <label for="availabilityStart" class="form-label">Available From</label>
+                                    <input type="date" class="form-control" id="availabilityStart" required readonly>
+                                </div>
+                                <div class="col">
+                                    <label for="availabilityEnd" class="form-label">Available To</label>
+                                    <input type="date" class="form-control" id="availabilityEnd" required readonly>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="d-flex gap-2">
@@ -338,7 +346,8 @@ const routes = [
             const inputZipCode = page.querySelector('#zipCode');
             const inputSkills = page.querySelector('#skills');
             const inputPreferences = page.querySelector('#preferences');
-            const inputAvailability = page.querySelector('#availability');
+            const inputAvailabilityStart = page.querySelector('#availabilityStart');
+            const inputAvailabilityEnd = page.querySelector('#availabilityEnd');
             const btnEdit = page.querySelector('#editButton');
             const btnSave = page.querySelector('#saveButton');
             const form = page.querySelector('#profileForm');
@@ -354,7 +363,8 @@ const routes = [
                         inputState.value = data.state || '';
                         inputZipCode.value = data.zipCode || '';
                         inputPreferences.value = data.preferences || '';
-                        inputAvailability.value = data.availability || '';
+                        inputAvailabilityStart.value = data.availabilityStart || '';
+                        inputAvailabilityEnd.value = data.availabilityEnd || '';
                         for (let option of inputSkills.options) {
                             option.selected = data.skills?.includes(option.value);
                         }
@@ -383,6 +393,13 @@ const routes = [
                     alert("Zip code must be exactly 5 digits.");
                     return;
                 }
+                //Date range check
+                const startDate = new Date(inputAvailabilityStart.value);
+                const endDate = new Date(inputAvailabilityEnd.value);
+                if (startDate > endDate) {
+                    alert("Available To date cannot be earlier than Available From date!");
+                    return;
+                }
                 const updatedProfile = {
                     fullName: inputFullName.value,
                     address1: inputAddress1.value,
@@ -391,7 +408,8 @@ const routes = [
                     state: inputState.value,
                     zipCode: inputZipCode.value,
                     preferences: inputPreferences.value,
-                    availability: inputAvailability.value,
+                    availabilityStart: inputAvailabilityStart.value,
+                    availabilityEnd: inputAvailabilityEnd.value,
                     skills: Array.from(inputSkills.selectedOptions).map(option => option.value)
                 };
                 try {
