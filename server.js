@@ -180,31 +180,31 @@ app.post('/api/events/update', requireLogin, (req, res) => { });
 app.get('/api/events/match/check', requireLogin, (req, res) => {
     const eventId = req.query.eventId;
     const event = events[eventId];
-    
+
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
-    
+
     const matchingVolunteers = [];
-    
+
     for (const userId in users) {
         const user = users[userId];
         const profile = user.profile;
-        
+
         if (eventAssignments[eventId] && eventAssignments[eventId].includes(userId)) {
             continue;
         }
-        
-        const hasRequiredSkills = event.requiredSkills.some(skill => 
+
+        const hasRequiredSkills = event.requiredSkills.some(skill =>
             profile.skills.includes(skill)
         );
-        
+
         const isAvailable = profile.availability_dates.includes(event.date);
-        
-        const locationMatch = profile.city && profile.state && 
-            event.location.includes(profile.city) && 
+
+        const locationMatch = profile.city && profile.state &&
+            event.location.includes(profile.city) &&
             event.location.includes(profile.state);
-        
+
         if (hasRequiredSkills && isAvailable && locationMatch) {
             matchingVolunteers.push({
                 userId: userId,
@@ -215,38 +215,38 @@ app.get('/api/events/match/check', requireLogin, (req, res) => {
             });
         }
     }
-    
+
     res.sendApiOkay({ volunteers: matchingVolunteers });
 });
 
 // Assign a volunteer to an event (admin only)
 app.post('/api/events/match/assign', requireLogin, (req, res) => {
     const { eventId, volunteerId } = req.body;
-    
+
     if (!volunteerId) {
         return res.sendApiError(400, 'missing_volunteer', 'Volunteer ID is required');
     }
-    
+
     const event = events[eventId];
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
-    
+
     const volunteer = users[volunteerId];
     if (!volunteer) {
         return res.sendApiError(404, 'volunteer_not_found', 'Volunteer not found');
     }
-    
+
     if (!eventAssignments[eventId]) {
         eventAssignments[eventId] = [];
     }
-    
+
     if (eventAssignments[eventId].includes(volunteerId)) {
         return res.sendApiError(400, 'already_assigned', 'Volunteer is already assigned to this event');
     }
-    
+
     eventAssignments[eventId].push(volunteerId);
-    
+
     // Send notification to volunteer about assignment
     sendNotification(volunteerId, {
         type: 'assignment',
@@ -254,7 +254,7 @@ app.post('/api/events/match/assign', requireLogin, (req, res) => {
         eventId: eventId,
         date: new Date().toISOString()
     });
-    
+
     // Add to volunteer history
     addToHistory(volunteerId, {
         eventId: eventId,
@@ -266,7 +266,7 @@ app.post('/api/events/match/assign', requireLogin, (req, res) => {
         date: event.date,
         status: 'Assigned'
     });
-    
+
     res.sendApiOkay({ message: 'Volunteer assigned successfully' });
 });
 

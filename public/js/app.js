@@ -80,12 +80,8 @@ const routes = [
                 msg.style.color = '';
 
                 try {
-                    const response = await fetch('/api/auth/register', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, password })
-                    });
-                    const data = await response.json();
+                    const response = await axios.post('/api/auth/register', { email, password });
+                    const data = response.data;
                     if (data.success) {
                         msg.style.color = 'green';
                         msg.textContent = 'Registration successful! Redirecting to login...';
@@ -160,7 +156,7 @@ const routes = [
             render(page);
         }
     },
-    
+
     // User profile editor form
     {
         path: '/profile',
@@ -233,10 +229,10 @@ const routes = [
                     </form>
                 </div>
             `;
-            
+
             //Check if a token exists
             const token = localStorage.getItem('token');
-            if(!token) {
+            if (!token) {
                 alert("Please log in first.");
                 navigateTo('/login');
             }
@@ -255,28 +251,30 @@ const routes = [
 
             function loadProfile() {
                 const token = localStorage.getItem("token");
-                axios.get('/api/profile', { headers: {Authorization: `Bearer ${token}`}}).then(response => {
-                    const data = response.data;
+                (async () => {
+                    try {
+                        const response = await axios.get('/api/profile', { headers: { Authorization: `Bearer ${token}` } });
+                        const data = response.data;
 
-                    inputFullName.value = data.fullName || '';
-                    inputAddress1.value = data.address1 || '';
-                    inputAddress2.value = data.address2 || '';
-                    inputCity.value = data.city || '';
-                    inputState.value = data.state || '';
-                    inputZipCode.value = data.zipCode || '';
-                    inputPreferences.value = data.preferences || '';
-                    inputAvailability.value = data.availability || '';
+                        inputFullName.value = data.fullName || '';
+                        inputAddress1.value = data.address1 || '';
+                        inputAddress2.value = data.address2 || '';
+                        inputCity.value = data.city || '';
+                        inputState.value = data.state || '';
+                        inputZipCode.value = data.zipCode || '';
+                        inputPreferences.value = data.preferences || '';
+                        inputAvailability.value = data.availability || '';
 
-                    for (let option of inputSkills.options){
-                        option.selected = data.skills?.includes(option.value);
+                        for (let option of inputSkills.options) {
+                            option.selected = data.skills?.includes(option.value);
+                        }
+                    } catch (error) {
+                        console.error('Failed to load profile:', error);
+                        alert('Failed to load profile.');
                     }
-                })
-                .catch(error => {
-                    console.error('Failed to load profile:', error);
-                    alert('Failed to load profile.');
-                });
+                })();
             }
-            
+
             loadProfile();
 
             function enableEditing() {
@@ -288,10 +286,10 @@ const routes = [
                 btnSave.style.display = 'inline-block';
             }
 
-            function saveProfile(event) {
+            async function saveProfile(event) {
                 event.preventDefault();
                 //check that Zip code is only 5 digits
-                if (!/^\d{5}$/.test(inputZipCode.value)){
+                if (!/^\d{5}$/.test(inputZipCode.value)) {
                     alert("Zip code must be exactly 5 digits.");
                     return;
                 }
@@ -307,24 +305,23 @@ const routes = [
                     skills: Array.from(inputSkills.selectedOptions).map(option => option.value)
                 };
                 const token = localStorage.getItem("token");
-                
-                axios.post('/api/profile/update', updatedProfile, {
-                    headers: { Authorization: `Bearer ${token}`}
-                }).then(response => {
+                try {
+                    const response = await axios.post('/api/profile/update', updatedProfile, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
                     alert('Profile updated successfully!');
                     //Locks the fields again
                     const formElements = form.querySelectorAll('input, select, textarea');
-                    formElements.forEach(el => el.setAttribute('readonly',true));
+                    formElements.forEach(el => el.setAttribute('readonly', true));
                     inputState.disabled = true;
                     inputSkills.disabled = true;
                     btnEdit.style.display = 'inline-block';
                     btnSave.style.display = 'none';
-                })
-                .catch(error => {
+                } catch (error) {
                     console.error('Failed to update profile:', error);
                     const message = error.response?.data?.message || 'Profile update failed';
                     alert(message);
-                })
+                }
             }
 
             btnEdit.addEventListener('click', enableEditing);
