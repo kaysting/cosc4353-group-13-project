@@ -42,6 +42,16 @@ const checkPassword = async (password, hash) => {
     return bcrypt.compare(password, hash);
 };
 
+// Helper to normalize user account data (not profile)
+function normalizeUser(user) {
+    return {
+        email: user.email || '',
+        password_hash: user.password_hash || '',
+        is_email_verified: !!user.is_email_verified,
+        is_admin: !!user.is_admin
+    };
+}
+
 // Helper to normalize user profile data
 function normalizeProfile(profile) {
     return {
@@ -92,7 +102,8 @@ function normalizeHistoryEntry(entry) {
 }
 
 // In-memory data maps to act as database for now
-const users = {};
+const users = {}; // userId -> user account (email, password_hash, is_email_verified, is_admin)
+const userProfiles = {}; // userId -> user profile
 const sessions = {};
 const events = {};
 const notifications = {};
@@ -105,23 +116,15 @@ const emailVerificationCodes = {};
     const adminUserId = randomString(8, 'hex');
     const adminUserEmail = 'admin@example.com';
     const adminUserPassword = 'adminpassword';
-    users[adminUserId] = {
+    users[adminUserId] = normalizeUser({
         email: adminUserEmail,
         password_hash: await hashPassword(adminUserPassword),
         is_email_verified: true,
-        is_admin: true,
-        profile: normalizeProfile({
-            name: 'Admin User',
-            address_line1: '',
-            address_line2: '',
-            city: '',
-            state: '',
-            zip: '',
-            skills: [],
-            preference: '',
-            availability_dates: []
-        })
-    };
+        is_admin: true
+    });
+    userProfiles[adminUserId] = normalizeProfile({
+        name: 'Admin User'
+    });
     console.log(`Created temp admin user with ID: ${adminUserId}, Email: ${adminUserEmail}, Password: ${adminUserPassword}`);
 })();
 
@@ -236,12 +239,11 @@ app.post('/api/auth/register', async (req, res) => {
     }
     const userId = crypto.randomUUID();
     const passwordHash = await hashPassword(password);
-    users[userId] = {
-        email, password_hash: passwordHash,
-        is_email_verified: false,
-        is_admin: false,
-        profile: normalizeProfile({})
-    };
+    users[userId] = normalizeUser({
+        email,
+        password_hash: passwordHash
+    });
+    userProfiles[userId] = normalizeProfile({});
     // Send welcome notification
     sendNotification(userId,
         'Welcome to Volunteer Platform!',
@@ -296,6 +298,7 @@ const requireLogin = (req, res, next) => {
     }
     req.userId = userId;
     req.user = users[userId];
+    req.profile = userProfiles[userId];
     if (!req.user) {
         return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
     }
@@ -314,7 +317,7 @@ app.post('/api/auth/logout', requireLogin, (req, res) => { });
 
 // Get current user profile info
 app.get('/api/profile', requireLogin, (req, res) => {
-    const profile = normalizeProfile(req.user.profile);
+    const profile = normalizeProfile(req.profile);
     res.sendApiOkay({ profile });
 });
 
@@ -344,7 +347,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         }
     }
     //Update the User Profile
-    req.user.profile = normalizeProfile({
+    userProfiles[req.userId] = normalizeProfile({
         name,
         address_line1,
         address_line2,
@@ -466,17 +469,17 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
 
     for (const userId in users) {
         const user = users[userId];
-        const profile = user.profile;
+        const profile = userProfiles[userId];
 
         if (eventAssignments[eventId] && eventAssignments[eventId].includes(userId)) {
             continue;
         }
 
         const hasRequiredSkills = event.skills.some(skill =>
-            profile.skills.includes(skill)
+            (profile.skills || []).includes(skill)
         );
 
-        const isAvailable = profile.availability_dates.includes(event.date);
+        const isAvailable = (profile.availability_dates || []).includes(event.date);
 
         const locationMatch = profile.city && profile.state &&
             event.location.includes(profile.city) &&
