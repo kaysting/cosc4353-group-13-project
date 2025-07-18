@@ -849,7 +849,7 @@ async function renderEventForm(mode, eventId = null) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
-            eventId: eventId,
+            id: eventId,
             name: form.eventName.value.trim(),
             description: form.eventDescription.value.trim(),
             location: form.eventLocation.value.trim(),
