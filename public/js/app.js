@@ -82,7 +82,7 @@ const routes = [
                 msg.style.color = '';
 
                 const data = await api.auth.register(email, password);
-                if (data && data.success === false) {
+                if (data.success === false) {
                     msg.style.color = 'red';
                     msg.textContent = data.message || 'Registration failed.';
                     return;
