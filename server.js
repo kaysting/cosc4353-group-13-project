@@ -250,7 +250,16 @@ app.post('/api/profile/events', requireLogin, (req, res) => { });
 app.get('/api/events', requireLogin, (req, res) => { });
 
 // Get a single event (admin only)
-app.get('/api/events/event', requireLogin, (req, res) => { });
+app.get('/api/events/event', requireLogin, (req, res) => { 
+    const eventId = req.query.eventId;
+    const event = events[eventId];
+
+    if (!event) {
+        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    }
+
+    res.sendApiOkay({ event });
+});
 
 // Create new event (admin only)
 app.post('/api/events/create', requireLogin, (req, res) => {
