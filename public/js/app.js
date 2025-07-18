@@ -1,3 +1,5 @@
+import api from './api.js';
+
 const elPageContainer = document.getElementById('page');
 
 function render(elPageContent) {
@@ -79,23 +81,17 @@ const routes = [
                 msg.textContent = '';
                 msg.style.color = '';
 
-                try {
-                    const response = await axios.post('/api/auth/register', { email, password });
-                    const data = response.data;
-                    if (data.success) {
-                        msg.style.color = 'green';
-                        msg.textContent = 'Registration successful! Redirecting to login...';
-                        setTimeout(() => {
-                            window.location.hash = '/login';
-                        }, 1200);
-                    } else {
-                        msg.style.color = 'red';
-                        msg.textContent = data.message || 'Registration failed.';
-                    }
-                } catch (err) {
+                const data = await api.auth.register(email, password);
+                if (data && data.success === false) {
                     msg.style.color = 'red';
-                    msg.textContent = 'Network error. Please try again.';
+                    msg.textContent = data.message || 'Registration failed.';
+                    return;
                 }
+                msg.style.color = 'green';
+                msg.textContent = 'Registration successful! Redirecting to login...';
+                setTimeout(() => {
+                    window.location.hash = '/login';
+                }, 1200);
             });
             render(page);
         }
@@ -250,12 +246,9 @@ const routes = [
             const form = page.querySelector('#profileForm');
 
             function loadProfile() {
-                const token = localStorage.getItem("token");
                 (async () => {
                     try {
-                        const response = await axios.get('/api/profile', { headers: { Authorization: `Bearer ${token}` } });
-                        const data = response.data;
-
+                        const data = await api.profile.get();
                         inputFullName.value = data.fullName || '';
                         inputAddress1.value = data.address1 || '';
                         inputAddress2.value = data.address2 || '';
@@ -264,7 +257,6 @@ const routes = [
                         inputZipCode.value = data.zipCode || '';
                         inputPreferences.value = data.preferences || '';
                         inputAvailability.value = data.availability || '';
-
                         for (let option of inputSkills.options) {
                             option.selected = data.skills?.includes(option.value);
                         }
@@ -304,11 +296,12 @@ const routes = [
                     availability: inputAvailability.value,
                     skills: Array.from(inputSkills.selectedOptions).map(option => option.value)
                 };
-                const token = localStorage.getItem("token");
                 try {
-                    const response = await axios.post('/api/profile/update', updatedProfile, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
+                    const data = await api.profile.update(updatedProfile);
+                    if (data && data.success === false) {
+                        alert(data.message || 'Profile update failed');
+                        return;
+                    }
                     alert('Profile updated successfully!');
                     //Locks the fields again
                     const formElements = form.querySelectorAll('input, select, textarea');
@@ -319,7 +312,7 @@ const routes = [
                     btnSave.style.display = 'none';
                 } catch (error) {
                     console.error('Failed to update profile:', error);
-                    const message = error.response?.data?.message || 'Profile update failed';
+                    const message = (error && error.message) ? error.message : 'Profile update failed';
                     alert(message);
                 }
             }
@@ -427,16 +420,23 @@ const routes = [
                     date: document.getElementById('eventDate').value
                 };
 
+                const token = localStorage.getItem('token'); // Using 'token' which you're storing manually for now
+
+                if (!token) {
+                    alert('Authorization token missing. Please login first.');
+                    return;
+                }
+
                 try {
-                    const response = await api.events.create(formData);
-                    if (response.success) {
-                        alert('Event created successfully!');
-                        console.log(response.event); // newly created event object
-                    } else {
-                        alert('Error creating event: ' + (response.message || 'Unknown error'));
+                    const data = await api.events.create(formData);
+                    if (data && data.success === false) {
+                        alert(data.message || 'Error creating event.');
+                        return;
                     }
+                    alert('Event created successfully!');
+                    console.log(data);
                 } catch (err) {
-                    alert('Unexpected error: ' + err.message);
+                    alert('Error creating event: ' + (err.response?.data?.message || err.message));
                     console.error(err);
                 }
             });
