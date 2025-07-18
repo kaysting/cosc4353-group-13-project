@@ -396,10 +396,7 @@ app.post('/api/events/update', requireLogin, (req, res) => {
     event.urgency = urgency;
     event.date = date;
 
-    console.log(`Updated event ${id}: ${name}`);
-
-    res.sendApiOkay({ event });
-});console.log(`Updated event ${id}: ${name}`);
+   console.log(`Updated event ${id}: ${name}`);
 
     // Notify assigned volunteers about the update
     if (eventAssignments[id]) {
