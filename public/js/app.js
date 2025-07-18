@@ -269,7 +269,7 @@ const routes = [
             const token = localStorage.getItem('token');
             if (!token) {
                 alert("Please log in first.");
-                navigateTo('/login');
+                navigate('/login');
             }
             const inputFullName = page.querySelector('#fullName');
             const inputAddress1 = page.querySelector('#address1');
