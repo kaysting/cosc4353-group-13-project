@@ -171,7 +171,28 @@ app.get('/api/events', requireLogin, (req, res) => { });
 app.get('/api/events/event', requireLogin, (req, res) => { });
 
 // Create new event (admin only)
-app.post('/api/events/create', requireLogin, (req, res) => { });
+app.post('/api/events/create', requireLogin, (req, res) => {
+    const { name, description, location, skills, urgency, date } = req.body;
+
+    if (!name || !description || !location || !Array.isArray(skills) || !urgency || !date) {
+        return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
+    }
+
+    const eventId = crypto.randomUUID(); // generate unique event ID
+    events[eventId] = {
+        id: eventId,
+        name,
+        description,
+        location,
+        skills,
+        urgency,
+        date,
+        createdBy: req.userId
+    };
+
+    console.log(`Created event ${eventId}: ${name}`);
+    res.sendApiOkay({ event: events[eventId] });
+});
 
 // Update existing event info (admin only)
 app.post('/api/events/update', requireLogin, (req, res) => { });
