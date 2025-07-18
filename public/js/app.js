@@ -132,7 +132,8 @@ const routes = [
 
     // Email verification form
     {
-
+        path: '/register/verify',
+        handler: () => { }
     },
 
     // User login form
@@ -767,13 +768,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
-
-for (const anchor of anchors) {
-    const href = anchor.getAttribute('href');
-    if (href && href.startsWith('/') && !href.startsWith('//')) {
-        anchor.addEventListener('click', (e) => {
-            e.preventDefault();
-            navigate(href);
-        });
-    }
-}
