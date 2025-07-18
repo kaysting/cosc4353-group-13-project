@@ -1,12 +1,16 @@
-// Helper to always return response.data or error.response.data, or throw error
+// Helper to always return response.data or error.response.data, or error object
 async function handleApiRequest(fn) {
     try {
         const response = await fn();
         if (response.data) return response.data;
-        throw new Error('No response data');
+        return { success: false, code: 'axios_error', message: 'No response data' };
     } catch (error) {
         if (error.response && error.response.data) return error.response.data;
-        throw error;
+        return {
+            success: false,
+            code: 'axios_error',
+            message: error && error.toString ? error.toString() : 'Unknown error'
+        };
     }
 }
 

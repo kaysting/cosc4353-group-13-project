@@ -13,16 +13,17 @@ const isZipValid = zip => /^\d{5}$/.test(zip);
 const isDateValid = date => !isNaN(Date.parse(date));
 
 const hashPassword = async (password) => {
-    return await bcrypt.hash(password, 10);
+    return bcrypt.hash(password, 10);
 };
 
 const checkPassword = async (password, hash) => {
-    return await bcrypt.compare(password, hash);
+    return bcrypt.compare(password, hash);
 };
 
 // In-memory data maps to act as database for now
-const users = {
-    placeholderAdminUser: {
+const users = {};
+(async () => {
+    users.placeholderAdminUser = {
         email: 'admin@example.com',
         password_hash: await hashPassword('adminpassword'),
         is_email_verified: true,
@@ -38,8 +39,9 @@ const users = {
             preference: '',
             availability_dates: []
         }
-    }
-};
+    };
+})();
+
 const sessions = {};
 const events = {};
 const notifications = {};
