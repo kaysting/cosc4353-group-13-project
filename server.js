@@ -287,9 +287,9 @@ app.post('/api/events/create', requireLogin, (req, res) => {
 
 // Update existing event info (admin only)
 app.post('/api/events/update', requireLogin, (req, res) => {
-    const { eventId, name, description, location, skills, urgency, date } = req.body;
-
-    const event = events[eventId];
+    const { id, name, description, location, skills, urgency, date } = req.body;
+    const event = events[id];
+    
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
@@ -302,7 +302,7 @@ app.post('/api/events/update', requireLogin, (req, res) => {
     event.urgency = urgency;
     event.date = date;
 
-    console.log(`Updated event ${eventId}: ${name}`);
+    console.log(`Updated event ${id}: ${name}`);
 
     res.sendApiOkay({ event });
 });
