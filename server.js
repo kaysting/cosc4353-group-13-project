@@ -50,7 +50,7 @@ const eventAssignments = {};
 
 // Function to send notifications to users
 // Stores notifications in the database and sends an email
-const sendNotification = (userId, message) => {
+const sendNotification = (recipientId, header, description, time = Date.now()) => {
     // ...
 };
 
