@@ -202,7 +202,19 @@ app.post('/api/auth/register', async (req, res) => {
             preference: '',
             availability_dates: []
         }
-    };
+   };
+    // Send welcome notification
+    sendNotification(userId, 
+        'Welcome to Volunteer Platform!', 
+        'Thank you for registering. Please complete your profile to get started with volunteering opportunities.'
+    );
+    
+    // Send verification email
+    if (config.mailgun_api_key) {
+        sendVerificationEmail(email).catch(err => {
+            console.error(`Failed to send verification email to ${email}:`, err);
+        });
+    }
     console.log(`Created user ${userId} (${email})`);
 });
 
@@ -387,6 +399,19 @@ app.post('/api/events/update', requireLogin, (req, res) => {
     console.log(`Updated event ${id}: ${name}`);
 
     res.sendApiOkay({ event });
+});console.log(`Updated event ${id}: ${name}`);
+
+    // Notify assigned volunteers about the update
+    if (eventAssignments[id]) {
+        eventAssignments[id].forEach(volunteerId => {
+            sendNotification(volunteerId,
+                'Event Updated',
+                `The event "${event.name}" you're assigned to has been updated. Please check the event details.`
+            );
+        });
+    }
+
+    res.sendApiOkay({ event });
 });
 
 // Get volunteers that are available for a certain event (admin only)
@@ -408,7 +433,7 @@ app.get('/api/events/match/check', requireLogin, (req, res) => {
             continue;
         }
 
-        const hasRequiredSkills = event.requiredSkills.some(skill =>
+        const hasRequiredSkills = event.skills.some(skill =>
             profile.skills.includes(skill)
         );
 
@@ -460,25 +485,14 @@ app.post('/api/events/match/assign', requireLogin, (req, res) => {
 
     eventAssignments[eventId].push(volunteerId);
 
-    // Send notification to volunteer about assignment
-    sendNotification(volunteerId, {
-        type: 'assignment',
-        message: `You have been assigned to "${event.name}" on ${event.date}`,
-        eventId: eventId,
-        date: new Date().toISOString()
-    });
+  // Send notification to volunteer about assignment
+    sendNotification(volunteerId, 
+        'Event Assignment',
+        `You have been assigned to "${event.name}" on ${event.date}`
+    );
 
     // Add to volunteer history
-    addToHistory(volunteerId, {
-        eventId: eventId,
-        eventName: event.name,
-        description: event.description,
-        location: event.location,
-        requiredSkills: event.requiredSkills,
-        urgency: event.urgency,
-        date: event.date,
-        status: 'Assigned'
-    });
+    addVolunteerHistory(volunteerId, eventId);
 
     res.sendApiOkay({ message: 'Volunteer assigned successfully' });
 });
