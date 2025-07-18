@@ -244,10 +244,35 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
 });
 
 // Get events assigned to the current user
-app.post('/api/profile/events', requireLogin, (req, res) => { });
+app.post('/api/profile/events', requireLogin, (req, res) => { 
+    const userId = req.userId;
+    const assigned = [];
+
+    for (const [eventId, volunteerIds] of Object.entries(eventAssignments)) {
+        if (volunteerIds.includes(userId)) {
+            assigned.push(events[eventId]);
+        }
+    }
+
+    // Log the request
+    console.log(`User ${userId} fetched ${assigned.length} assigned event(s)`);
+
+    res.sendApiOkay({ events: assigned });
+});
 
 // Get all events (admin only)
-app.get('/api/events', requireLogin, (req, res) => { });
+app.get('/api/events', requireLogin, (req, res) => { 
+    if (!req.user.is_admin) {
+        return res.sendApiError(403, 'unauthorized', 'Admin access required');
+    }
+
+    const allEvents = Object.values(events);
+
+    // Log the request
+    console.log(`Admin ${req.userId} fetched all events (${allEvents.length} total)`);
+
+    res.sendApiOkay({ events: allEvents });
+});
 
 // Get a single event (admin only)
 app.get('/api/events/event', requireLogin, (req, res) => { 
