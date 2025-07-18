@@ -269,7 +269,7 @@ app.post('/api/events/create', requireLogin, (req, res) => {
         return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
 
-    const eventId = crypto.randomUUID(); // generate unique event ID
+    const eventId = randomString(8, 'hex'); // shorter, readable ID
     events[eventId] = {
         id: eventId,
         name,
