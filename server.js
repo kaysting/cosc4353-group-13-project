@@ -76,10 +76,33 @@ const emailVerificationCodes = {};
     console.log(`Created temp admin user with ID: ${adminUserId}, Email: ${adminUserEmail}, Password: ${adminUserPassword}`);
 })();
 
-// Function to send notifications to users
-// Stores notifications in the database and sends an email
 const sendNotification = (recipientId, header, description, time = Date.now()) => {
-    // ...
+    if (!notifications[recipientId]) {
+        notifications[recipientId] = [];
+    }
+    
+    const notification = {
+        id: crypto.randomUUID(),
+        header,
+        description,
+        time,
+        read: false
+    };
+    
+    notifications[recipientId].push(notification);
+    
+    // Send email notification if user exists and email is verified
+    const user = users[recipientId];
+    if (user && user.is_email_verified) {
+        sendEmail(
+            'Volunteer Platform',
+            user.email,
+            header,
+            description
+        ).catch(err => {
+            console.error(`Failed to send email to ${user.email}:`, err);
+        });
+    }
 };
 
 const sendEmail = async (senderName, to, subject, text) => {
@@ -104,9 +127,25 @@ const sendVerificationEmail = async (email) => {
     );
 };
 
-// Function to add a volunteer history entry
 const addVolunteerHistory = (userId, eventId) => {
-    // ...
+    if (!volunteerHistory[userId]) {
+        volunteerHistory[userId] = [];
+    }
+    
+    const event = events[eventId];
+    if (!event) return;
+    
+    volunteerHistory[userId].push({
+        eventId: eventId,
+        eventName: event.name,
+        description: event.description,
+        location: event.location,
+        requiredSkills: event.skills,
+        urgency: event.urgency,
+        date: event.date,
+        status: 'Assigned',
+        assignedAt: new Date().toISOString()
+    });
 };
 
 // Use Express' built-in JSON parser
