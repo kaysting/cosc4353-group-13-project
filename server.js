@@ -12,11 +12,19 @@ const isEmailValid = email => {
 const isZipValid = zip => /^\d{5}$/.test(zip);
 const isDateValid = date => !isNaN(Date.parse(date));
 
+const hashPassword = async (password) => {
+    return await bcrypt.hash(password, 10);
+};
+
+const checkPassword = async (password, hash) => {
+    return await bcrypt.compare(password, hash);
+};
+
 // In-memory data maps to act as database for now
 const users = {
     placeholderAdminUser: {
         email: 'admin@example.com',
-        password_hash: await bcrypt.hash('adminpassword', 10),
+        password_hash: await hashPassword('adminpassword'),
         is_email_verified: true,
         is_admin: true,
         profile: {
@@ -85,7 +93,7 @@ app.post('/api/auth/register', async (req, res) => {
         }
     }
     const userId = crypto.randomUUID();
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
     users[userId] = {
         email, password_hash: passwordHash,
         is_email_verified: false,
