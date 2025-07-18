@@ -160,7 +160,7 @@ const routes = [
             render(page);
         }
     },
-
+    
     // User profile editor form
     {
         path: '/profile',
@@ -233,18 +233,13 @@ const routes = [
                     </form>
                 </div>
             `;
-            //Testing purposes
-            let userData = {
-                fullName: "Placeholder Name",
-                address1: "123 Street St",
-                address2: "64 Apt",
-                city: "Houston",
-                state: "TX",
-                zipCode: "77001",
-                skills: ["html", "css"],
-                preferences: "Prefers remote work",
-                availability: "2025-07-01"
-            };
+            
+            //Check if a token exists
+            const token = localStorage.getItem('token');
+            if(!token) {
+                alert("Please log in first.");
+                navigateTo('/login');
+            }
             const inputFullName = page.querySelector('#fullName');
             const inputAddress1 = page.querySelector('#address1');
             const inputAddress2 = page.querySelector('#address2');
@@ -259,18 +254,29 @@ const routes = [
             const form = page.querySelector('#profileForm');
 
             function loadProfile() {
-                inputFullName.value = userData.fullName;
-                inputAddress1.value = userData.address1;
-                inputAddress2.value = userData.address2;
-                inputCity.value = userData.city;
-                inputState.value = userData.state;
-                inputZipCode.value = userData.zipCode;
-                inputPreferences.value = userData.preferences;
-                inputAvailability.value = userData.availability;
-                for (let option of inputSkills.options) {
-                    option.selected = userData.skills.includes(option.value);
-                }
+                const token = localStorage.getItem("token");
+                axios.get('/api/profile', { headers: {Authorization: `Bearer ${token}`}}).then(response => {
+                    const data = response.data;
+
+                    inputFullName.value = data.fullName || '';
+                    inputAddress1.value = data.address1 || '';
+                    inputAddress2.value = data.address2 || '';
+                    inputCity.value = data.city || '';
+                    inputState.value = data.state || '';
+                    inputZipCode.value = data.zipCode || '';
+                    inputPreferences.value = data.preferences || '';
+                    inputAvailability.value = data.availability || '';
+
+                    for (let option of inputSkills.options){
+                        option.selected = data.skills?.includes(option.value);
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load profile:', error);
+                    alert('Failed to load profile.');
+                });
             }
+            
             loadProfile();
 
             function enableEditing() {
@@ -284,25 +290,41 @@ const routes = [
 
             function saveProfile(event) {
                 event.preventDefault();
-                userData.fullName = inputFullName.value;
-                userData.address1 = inputAddress1.value;
-                userData.address2 = inputAddress2.value;
-                userData.city = inputCity.value;
-                userData.state = inputState.value;
-                userData.zipCode = inputZipCode.value;
-                userData.preferences = inputPreferences.value;
-                userData.availability = inputAvailability.value;
-
-                userData.skills = Array.from(inputSkills.selectedOptions).map(option => option.value);
-
-                alert('Profile updated successfully!');
-
-                const formElements = form.querySelectorAll('input, select, textarea');
-                formElements.forEach(el => el.setAttribute('readonly', true));
-                inputState.disabled = true;
-                inputSkills.disabled = true;
-                btnEdit.style.display = 'inline-block';
-                btnSave.style.display = 'none';
+                //check that Zip code is only 5 digits
+                if (!/^\d{5}$/.test(inputZipCode.value)){
+                    alert("Zip code must be exactly 5 digits.");
+                    return;
+                }
+                const updatedProfile = {
+                    fullName: inputFullName.value,
+                    address1: inputAddress1.value,
+                    address2: inputAddress2.value,
+                    city: inputCity.value,
+                    state: inputState.value,
+                    zipCode: inputZipCode.value,
+                    preferences: inputPreferences.value,
+                    availability: inputAvailability.value,
+                    skills: Array.from(inputSkills.selectedOptions).map(option => option.value)
+                };
+                const token = localStorage.getItem("token");
+                
+                axios.post('/api/profile/update', updatedProfile, {
+                    headers: { Authorization: `Bearer ${token}`}
+                }).then(response => {
+                    alert('Profile updated successfully!');
+                    //Locks the fields again
+                    const formElements = form.querySelectorAll('input, select, textarea');
+                    formElements.forEach(el => el.setAttribute('readonly',true));
+                    inputState.disabled = true;
+                    inputSkills.disabled = true;
+                    btnEdit.style.display = 'inline-block';
+                    btnSave.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Failed to update profile:', error);
+                    const message = error.response?.data?.message || 'Profile update failed';
+                    alert(message);
+                })
             }
 
             btnEdit.addEventListener('click', enableEditing);
