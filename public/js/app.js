@@ -415,9 +415,30 @@ const routes = [
 
             // Basic client-side validation handler
             const form = page.querySelector('#eventForm');
-            form.addEventListener('submit', (e) => {
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                alert('Event form submitted successfully!');
+
+                const formData = {
+                    name: document.getElementById('eventName').value.trim(),
+                    description: document.getElementById('eventDescription').value.trim(),
+                    location: document.getElementById('eventLocation').value.trim(),
+                    skills: Array.from(document.getElementById('requiredSkills').selectedOptions).map(opt => opt.value),
+                    urgency: document.getElementById('urgency').value,
+                    date: document.getElementById('eventDate').value
+                };
+
+                const token = localStorage.getItem('session_token');
+
+                try {
+                    const response = await axios.post('/api/events/create', formData, {
+                        headers: { Authorization: token }
+                    });
+                    alert('Event created successfully!');
+                    console.log(response.data);
+                } catch (err) {
+                    alert('Error creating event: ' + (err.response?.data?.message || err.message));
+                    console.error(err);
+                }
             });
 
             render(page);
