@@ -436,7 +436,7 @@ const routes = [
                     alert('Event created successfully!');
                     console.log(data);
                 } catch (err) {
-                    alert((err && err.message) ? err.message : 'Error creating event.');
+                    alert('Error creating event: ' + (err.response?.data?.message || err.message));
                     console.error(err);
                 }
             });
