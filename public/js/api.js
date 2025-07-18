@@ -1,72 +1,87 @@
+// Helper to always return response.data or error.response.data, or throw error
+async function handleApiRequest(fn) {
+    try {
+        const response = await fn();
+        if (response.data) return response.data;
+        throw new Error('No response data');
+    } catch (error) {
+        if (error.response && error.response.data) return error.response.data;
+        throw error;
+    }
+}
+
 const api = {
     auth: {
-        register: async (email, password) => {
-            return axios.post('/api/auth/register', { email, password });
-        },
+        register: (email, password) => handleApiRequest(() => axios.post('/api/auth/register', { email, password })),
         login: async (email, password) => {
-            const response = await axios.post('/api/auth/login', { email, password });
-            if (response.data && response.data.token) {
-                localStorage.setItem('token', response.data.token);
-            }
-            return response;
+            return handleApiRequest(async () => {
+                const response = await axios.post('/api/auth/login', { email, password });
+                if (response.data && response.data.token) {
+                    localStorage.setItem('token', response.data.token);
+                }
+                return response;
+            });
         },
         logout: async () => {
             const token = localStorage.getItem('token');
-            const res = await axios.post('/api/auth/logout', {}, { headers: { Authorization: token } });
-            localStorage.removeItem('token');
-            return res;
+            return handleApiRequest(async () => {
+                const response = await axios.post('/api/auth/logout', {}, { headers: { Authorization: token } });
+                if (response.success)
+                    localStorage.removeItem('token');
+                return response;
+            });
         },
     },
     profile: {
-        get: async () => {
+        get: () => {
             const token = localStorage.getItem('token');
-            return axios.get('/api/profile', { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.get('/api/profile', { headers: { Authorization: token } }));
         },
-        update: async (profile) => {
+        update: (profile) => {
             const token = localStorage.getItem('token');
-            return axios.post('/api/profile/update', profile, { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.post('/api/profile/update', profile, { headers: { Authorization: token } }));
         },
-        events: async () => {
+        events: () => {
             const token = localStorage.getItem('token');
-            return axios.post('/api/profile/events', {}, { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.post('/api/profile/events', {}, { headers: { Authorization: token } }));
         }
     },
     events: {
-        getAll: async () => {
+        getAll: () => {
             const token = localStorage.getItem('token');
-            return axios.get('/api/events', { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.get('/api/events', { headers: { Authorization: token } }));
         },
-        get: async (eventId) => {
+        get: (eventId) => {
             const token = localStorage.getItem('token');
-            return axios.get('/api/events/event', { params: { eventId }, headers: { Authorization: token } });
+            return handleApiRequest(() => axios.get('/api/events/event', { params: { eventId }, headers: { Authorization: token } }));
         },
-        create: async (event) => {
+        create: (event) => {
             const token = localStorage.getItem('token');
-            return axios.post('/api/events/create', event, { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.post('/api/events/create', event, { headers: { Authorization: token } }));
         },
-        update: async (event) => {
+        update: (event) => {
             const token = localStorage.getItem('token');
-            return axios.post('/api/events/update', event, { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.post('/api/events/update', event, { headers: { Authorization: token } }));
         },
-        matchCheck: async (eventId) => {
+        matchCheck: (eventId) => {
             const token = localStorage.getItem('token');
-            return axios.get('/api/events/match/check', { params: { eventId }, headers: { Authorization: token } });
+            return handleApiRequest(() => axios.get('/api/events/match/check', { params: { eventId }, headers: { Authorization: token } }));
         },
-        matchAssign: async (eventId, volunteerId) => {
+        matchAssign: (eventId, volunteerId) => {
             const token = localStorage.getItem('token');
-            return axios.post('/api/events/match/assign', { eventId, volunteerId }, { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.post('/api/events/match/assign', { eventId, volunteerId }, { headers: { Authorization: token } }));
         }
     },
     notifications: {
-        get: async () => {
+        get: () => {
             const token = localStorage.getItem('token');
-            return axios.get('/api/notifications', { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.get('/api/notifications', { headers: { Authorization: token } }));
         }
     },
     history: {
-        get: async () => {
+        get: () => {
             const token = localStorage.getItem('token');
-            return axios.get('/api/history', { headers: { Authorization: token } });
+            return handleApiRequest(() => axios.get('/api/history', { headers: { Authorization: token } }));
         }
     }
 };
