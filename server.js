@@ -302,6 +302,8 @@ app.post('/api/events/update', requireLogin, (req, res) => {
     event.urgency = urgency;
     event.date = date;
 
+    console.log(`Updated event ${eventId}: ${name}`);
+
     res.sendApiOkay({ event });
 });
 
