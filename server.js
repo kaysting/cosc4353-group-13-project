@@ -42,6 +42,55 @@ const checkPassword = async (password, hash) => {
     return bcrypt.compare(password, hash);
 };
 
+// Helper to normalize user profile data
+function normalizeProfile(profile) {
+    return {
+        name: profile.name || '',
+        address_line1: profile.address_line1 || '',
+        address_line2: profile.address_line2 || '',
+        city: profile.city || '',
+        state: profile.state || '',
+        zip: profile.zip || '',
+        skills: Array.isArray(profile.skills) ? profile.skills : [],
+        preference: profile.preference || '',
+        availability_dates: Array.isArray(profile.availability_dates) ? profile.availability_dates.map(d => new Date(d).toISOString()) : []
+    };
+}
+
+// Helper to normalize event data
+function normalizeEvent(event) {
+    return {
+        id: event.id,
+        name: event.name || '',
+        description: event.description || '',
+        location: event.location || '',
+        skills: Array.isArray(event.skills) ? event.skills : [],
+        urgency: event.urgency || '',
+        date: event.date ? new Date(event.date).toISOString() : '',
+        createdBy: event.createdBy || ''
+    };
+}
+
+// Helper to normalize notification data
+function normalizeNotification(notification) {
+    return {
+        id: notification.id,
+        header: notification.header || '',
+        description: notification.description || '',
+        time: typeof notification.time === 'number' ? notification.time : Date.now(),
+        read: !!notification.read
+    };
+}
+
+// Helper to normalize volunteer history entry
+function normalizeHistoryEntry(entry) {
+    return {
+        eventId: entry.eventId,
+        status: entry.status || 'Assigned',
+        assignedAt: entry.assignedAt ? new Date(entry.assignedAt).toISOString() : new Date().toISOString()
+    };
+}
+
 // In-memory data maps to act as database for now
 const users = {};
 const sessions = {};
@@ -61,7 +110,7 @@ const emailVerificationCodes = {};
         password_hash: await hashPassword(adminUserPassword),
         is_email_verified: true,
         is_admin: true,
-        profile: {
+        profile: normalizeProfile({
             name: 'Admin User',
             address_line1: '',
             address_line2: '',
@@ -71,7 +120,7 @@ const emailVerificationCodes = {};
             skills: [],
             preference: '',
             availability_dates: []
-        }
+        })
     };
     console.log(`Created temp admin user with ID: ${adminUserId}, Email: ${adminUserEmail}, Password: ${adminUserPassword}`);
 })();
@@ -80,7 +129,7 @@ const sendNotification = (recipientId, header, description, time = Date.now()) =
     if (!notifications[recipientId]) {
         notifications[recipientId] = [];
     }
-    
+
     const notification = {
         id: crypto.randomUUID(),
         header,
@@ -88,9 +137,9 @@ const sendNotification = (recipientId, header, description, time = Date.now()) =
         time,
         read: false
     };
-    
+
     notifications[recipientId].push(notification);
-    
+
     // Send email notification if user exists and email is verified
     const user = users[recipientId];
     if (user && user.is_email_verified) {
@@ -131,10 +180,10 @@ const addVolunteerHistory = (userId, eventId) => {
     if (!volunteerHistory[userId]) {
         volunteerHistory[userId] = [];
     }
-    
+
     const event = events[eventId];
     if (!event) return;
-    
+
     volunteerHistory[userId].push({
         eventId: eventId,
         eventName: event.name,
@@ -191,24 +240,14 @@ app.post('/api/auth/register', async (req, res) => {
         email, password_hash: passwordHash,
         is_email_verified: false,
         is_admin: false,
-        profile: {
-            name: '',
-            address_line1: '',
-            address_line2: '',
-            city: '',
-            state: '',
-            zip: '',
-            skills: [],
-            preference: '',
-            availability_dates: []
-        }
-   };
+        profile: normalizeProfile({})
+    };
     // Send welcome notification
-    sendNotification(userId, 
-        'Welcome to Volunteer Platform!', 
+    sendNotification(userId,
+        'Welcome to Volunteer Platform!',
         'Thank you for registering. Please complete your profile to get started with volunteering opportunities.'
     );
-    
+
     // Send verification email
     if (config.mailgun_api_key) {
         sendVerificationEmail(email).catch(err => {
@@ -263,12 +302,19 @@ const requireLogin = (req, res, next) => {
     next();
 };
 
+const requireAdmin = (req, res, next) => {
+    if (!req.user.is_admin) {
+        return res.sendApiError(403, 'unauthorized', 'Admin access required');
+    }
+    next();
+};
+
 // Log out and delete the current session token
 app.post('/api/auth/logout', requireLogin, (req, res) => { });
 
 // Get current user profile info
 app.get('/api/profile', requireLogin, (req, res) => {
-    const profile = req.user.profile;
+    const profile = normalizeProfile(req.user.profile);
     res.sendApiOkay({ profile });
 });
 
@@ -298,22 +344,22 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         }
     }
     //Update the User Profile
-    req.user.profile = {
+    req.user.profile = normalizeProfile({
         name,
         address_line1,
         address_line2,
         city,
         state,
         zip,
-        skills: Array.isArray(skills) ? skills : [],
+        skills,
         preference,
-        availability_dates: Array.isArray(availability_dates) ? availability_dates : []
-    };
+        availability_dates
+    });
     res.sendApiOkay({ message: 'Profile updated successfully!' });
 });
 
 // Get events assigned to the current user
-app.post('/api/profile/events', requireLogin, (req, res) => { 
+app.post('/api/profile/events', requireLogin, (req, res) => {
     const userId = req.userId;
     const assigned = [];
 
@@ -330,7 +376,7 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
 });
 
 // Get all events (admin only)
-app.get('/api/events', requireLogin, (req, res) => { 
+app.get('/api/events', requireLogin, (req, res) => {
     if (!req.user.is_admin) {
         return res.sendApiError(403, 'unauthorized', 'Admin access required');
     }
@@ -343,8 +389,8 @@ app.get('/api/events', requireLogin, (req, res) => {
     res.sendApiOkay({ events: allEvents });
 });
 
-// Get a single event (admin only)
-app.get('/api/events/event', requireLogin, (req, res) => { 
+// Get a single event
+app.get('/api/events/event', requireLogin, (req, res) => {
     const eventId = req.query.eventId;
     const event = events[eventId];
 
@@ -356,15 +402,13 @@ app.get('/api/events/event', requireLogin, (req, res) => {
 });
 
 // Create new event (admin only)
-app.post('/api/events/create', requireLogin, (req, res) => {
+app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
     const { name, description, location, skills, urgency, date } = req.body;
-
     if (!name || !description || !location || !Array.isArray(skills) || !urgency || !date) {
         return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
-
     const eventId = randomString(8, 'hex'); // shorter, readable ID
-    events[eventId] = {
+    events[eventId] = normalizeEvent({
         id: eventId,
         name,
         description,
@@ -373,31 +417,30 @@ app.post('/api/events/create', requireLogin, (req, res) => {
         urgency,
         date,
         createdBy: req.userId
-    };
-
+    });
     console.log(`Created event ${eventId}: ${name}`);
     res.sendApiOkay({ event: events[eventId] });
 });
 
 // Update existing event info (admin only)
-app.post('/api/events/update', requireLogin, (req, res) => {
+app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
     const { id, name, description, location, skills, urgency, date } = req.body;
     const event = events[id];
-    
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
-
     // Update event details
-    event.name = name;
-    event.description = description;
-    event.location = location;
-    event.skills = skills;
-    event.urgency = urgency;
-    event.date = date;
-
-   console.log(`Updated event ${id}: ${name}`);
-
+    Object.assign(event, normalizeEvent({
+        id,
+        name,
+        description,
+        location,
+        skills,
+        urgency,
+        date,
+        createdBy: event.createdBy
+    }));
+    console.log(`Updated event ${id}: ${name}`);
     // Notify assigned volunteers about the update
     if (eventAssignments[id]) {
         eventAssignments[id].forEach(volunteerId => {
@@ -407,12 +450,11 @@ app.post('/api/events/update', requireLogin, (req, res) => {
             );
         });
     }
-
     res.sendApiOkay({ event });
 });
 
 // Get volunteers that are available for a certain event (admin only)
-app.get('/api/events/match/check', requireLogin, (req, res) => {
+app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
     const eventId = req.query.eventId;
     const event = events[eventId];
 
@@ -455,7 +497,7 @@ app.get('/api/events/match/check', requireLogin, (req, res) => {
 });
 
 // Assign a volunteer to an event (admin only)
-app.post('/api/events/match/assign', requireLogin, (req, res) => {
+app.post('/api/events/match/assign', requireLogin, requireAdmin, (req, res) => {
     const { eventId, volunteerId } = req.body;
 
     if (!volunteerId) {
@@ -482,27 +524,40 @@ app.post('/api/events/match/assign', requireLogin, (req, res) => {
 
     eventAssignments[eventId].push(volunteerId);
 
-  // Send notification to volunteer about assignment
-    sendNotification(volunteerId, 
+    // Send notification to volunteer about assignment
+    sendNotification(volunteerId,
         'Event Assignment',
         `You have been assigned to "${event.name}" on ${event.date}`
     );
 
-    // Add to volunteer history
-    addVolunteerHistory(volunteerId, eventId);
-
+    // Add to volunteer history (store only eventId, status, assignedAt)
+    if (!volunteerHistory[volunteerId]) volunteerHistory[volunteerId] = [];
+    volunteerHistory[volunteerId].push(normalizeHistoryEntry({
+        eventId: eventId,
+        status: 'Assigned',
+        assignedAt: new Date().toISOString()
+    }));
     res.sendApiOkay({ message: 'Volunteer assigned successfully' });
 });
 
 // Get notifications for the current user
 app.get('/api/notifications', requireLogin, (req, res) => {
-    const userNotifications = notifications[req.userId] || [];
+    const userNotifications = (notifications[req.userId] || []).map(normalizeNotification);
     res.sendApiOkay({ notifications: userNotifications });
 });
 
 // Get volunteer history (maybe admin only?)
 app.get('/api/history', requireLogin, (req, res) => {
-    const history = volunteerHistory[req.userId] || [];
+    // Return event info by reference, not duplication
+    const history = (volunteerHistory[req.userId] || []).map(entry => {
+        const event = events[entry.eventId] || {};
+        return {
+            eventId: entry.eventId,
+            event: event.id ? normalizeEvent(event) : null,
+            status: entry.status,
+            assignedAt: entry.assignedAt
+        };
+    });
     res.sendApiOkay({ history });
 });
 // Catch-all route to serve the index.html file for any unmatched routes
