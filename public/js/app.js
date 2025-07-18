@@ -427,12 +427,20 @@ const routes = [
                     date: document.getElementById('eventDate').value
                 };
 
-                const token = localStorage.getItem('session_token');
+                const token = localStorage.getItem('token'); // Using 'token' which you're storing manually for now
+
+                if (!token) {
+                    alert('Authorization token missing. Please login first.');
+                    return;
+                }
 
                 try {
                     const response = await axios.post('/api/events/create', formData, {
-                        headers: { Authorization: token }
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
                     });
+
                     alert('Event created successfully!');
                     console.log(response.data);
                 } catch (err) {
