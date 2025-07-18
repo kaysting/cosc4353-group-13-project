@@ -59,13 +59,13 @@ const api = {
             const token = localStorage.getItem('token');
             return handleApiRequest(() => axios.get('/api/events/event', { params: { eventId }, headers: { Authorization: token } }));
         },
-        create: (event) => {
+        create: (eventInfo) => {
             const token = localStorage.getItem('token');
-            return handleApiRequest(() => axios.post('/api/events/create', event, { headers: { Authorization: token } }));
+            return handleApiRequest(() => axios.post('/api/events/create', eventInfo, { headers: { Authorization: token } }));
         },
-        update: (event) => {
+        update: (eventId, eventInfo) => {
             const token = localStorage.getItem('token');
-            return handleApiRequest(() => axios.post('/api/events/update', event, { headers: { Authorization: token } }));
+            return handleApiRequest(() => axios.post('/api/events/update', { eventId, ...eventInfo }, { headers: { Authorization: token } }));
         },
         matchCheck: (eventId) => {
             const token = localStorage.getItem('token');

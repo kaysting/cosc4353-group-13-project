@@ -44,10 +44,21 @@ const checkPassword = async (password, hash) => {
 
 // In-memory data maps to act as database for now
 const users = {};
+const sessions = {};
+const events = {};
+const notifications = {};
+const volunteerHistory = {};
+const eventAssignments = {};
+const emailVerificationCodes = {};
+
+// Create temporary admin user
 (async () => {
-    users.placeholderAdminUser = {
-        email: 'admin@example.com',
-        password_hash: await hashPassword('adminpassword'),
+    const adminUserId = randomString(8, 'hex');
+    const adminUserEmail = 'admin@example.com';
+    const adminUserPassword = 'adminpassword';
+    users[adminUserId] = {
+        email: adminUserEmail,
+        password_hash: await hashPassword(adminUserPassword),
         is_email_verified: true,
         is_admin: true,
         profile: {
@@ -62,14 +73,8 @@ const users = {};
             availability_dates: []
         }
     };
+    console.log(`Created temp admin user with ID: ${adminUserId}, Email: ${adminUserEmail}, Password: ${adminUserPassword}`);
 })();
-
-const sessions = {};
-const events = {};
-const notifications = {};
-const volunteerHistory = {};
-const eventAssignments = {};
-const emailVerificationCodes = {};
 
 // Function to send notifications to users
 // Stores notifications in the database and sends an email
@@ -77,15 +82,26 @@ const sendNotification = (recipientId, header, description, time = Date.now()) =
     // ...
 };
 
-const sendEmailVerification = async (email) => {
+const sendEmail = async (senderName, to, subject, text) => {
+    const data = {
+        from: `${senderName} <no-reply@${config.mailgun_domain}>`,
+        to,
+        subject,
+        text
+    };
+    await mg.messages.create(config.mailgun_domain, data);
+};
+
+const sendVerificationEmail = async (email) => {
     const code = randomString(6, 'numeric');
-    emailVerificationCodes[email] = code;
-    await mg.messages.create(config.mailgun_domain, {
-        from: `no-reply@${config.mailgun_domain}`,
-        to: email,
-        subject: 'Verify your email',
-        text: `Hi new volunteer!\n\nTo keep your account safe, please verify your email address by entering the code below on the website:\n\n${code}\n\nIf you did not create an account, please ignore this email.\n\nThanks!`
-    });
+    emailVerificationCodes[code] = email;
+    console.log(`Generated email verification code ${code} for ${email}`);
+    await sendEmail(
+        'Volunteer Platform',
+        email,
+        'Verify your email',
+        `Hey new volunteer!\n\nTo keep your account safe, please verify your email address by entering the code below on the website:\n\n${code}\n\nIf you did not create an account, please ignore this email.\n\nThanks!`
+    );
 };
 
 // Function to add a volunteer history entry
@@ -98,8 +114,10 @@ app.use(express.json());
 
 // Middleware for logging and utility functions
 app.use((req, res, next) => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    console.log(`${ip} ${req.method} ${req.url}`);
+    res.on('finish', () => {
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        console.log(`${ip} ${req.method} ${res.statusCode} ${req.url}`);
+    });
     res.sendApiError = (status, code, message) => {
         res.status(status).json({ success: false, code, message });
     };
