@@ -534,9 +534,78 @@ const routes = [
     {
         path: '/admin/events/:eventId',
         handler: (params) => {
-
+            renderEventForm('edit', params.eventId);
         }
     },
+    
+
+    // Admin: List all events to edit
+    {
+    path: '/admin/events',
+    handler: async () => {
+        const page = document.createElement('div');
+        page.innerHTML = `<h2>All Events</h2><div id="eventList"></div>`;
+
+        const eventListDiv = page.querySelector('#eventList');
+        const response = await api.events.getAll();
+
+        if (!response.success) {
+        eventListDiv.innerHTML = `<p class="text-danger">Error loading events: ${response.message}</p>`;
+        } else if (response.events.length === 0) {
+        eventListDiv.innerHTML = `<p>No events found.</p>`;
+        } else {
+        const list = document.createElement('ul');
+        list.className = 'list-group';
+
+        response.events.forEach(event => {
+            const item = document.createElement('li');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            item.textContent = `${event.name} (${event.date})`;
+
+            const editLink = document.createElement('a');
+            editLink.href = `/admin/events/${event.id}`;
+            editLink.textContent = 'Edit';
+            editLink.className = 'btn btn-sm btn-primary';
+
+            item.appendChild(editLink);
+            list.appendChild(item);
+        });
+
+        eventListDiv.appendChild(list);
+        }
+
+        render(page);
+    }
+    },
+
+    /*
+    // Admin: List all events to edit
+    {
+    path: '/admin/events',
+    handler: async () => {
+        const page = document.createElement('div');
+        page.innerHTML = `<h2>Edit Events</h2><ul id="eventList" class="list-group"></ul>`;
+
+        try {
+        const response = await api.events.getAll();
+        const events = response.events;
+
+        const list = page.querySelector('#eventList');
+        events.forEach(ev => {
+            const item = document.createElement('li');
+            item.className = 'list-group-item';
+            item.innerHTML = `<a href="/admin/events/${ev.id}/edit">${ev.name}</a>`;
+            list.appendChild(item);
+        });
+        } catch (err) {
+        page.innerHTML = `<p class="text-danger">Failed to load events.</p>`;
+        console.error(err);
+        }
+
+        render(page);
+    }
+    },
+    */
 
     // Admin event volunteer matching page
     {
@@ -768,4 +837,118 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+});
+
+async function renderEventForm(mode, eventId = null) {
+    const page = document.createElement('div');
+    const title = mode === 'edit' ? 'Edit Event' : 'Create Event';
+    page.innerHTML = `<h2>${title}</h2><form id="eventForm">Loading...</form>`;
+    render(page);
+
+    const form = page.querySelector('#eventForm');
+
+    let eventData = {
+        name: '',
+        description: '',
+        location: '',
+        skills: [],
+        urgency: '',
+        date: ''
+    };
+
+    if (mode === 'edit') {
+        const response = await api.events.get(eventId);
+        if (!response.success) {
+            form.innerHTML = `<p class="text-danger">${response.message}</p>`;
+            return;
+        }
+        eventData = response.event;
+    }
+
+    form.innerHTML = `
+        <div class="form-group mb-3">
+            <label>Event Name</label>
+            <input type="text" id="eventName" class="form-control" value="${eventData.name}" required>
+        </div>
+        <div class="form-group mb-3">
+            <label>Description</label>
+            <textarea id="eventDescription" class="form-control" required>${eventData.description}</textarea>
+        </div>
+        <div class="form-group mb-3">
+            <label>Location</label>
+            <textarea id="eventLocation" class="form-control" required>${eventData.location}</textarea>
+        </div>
+        <div class="form-group mb-3">
+            <label>Required Skills</label>
+            <select id="requiredSkills" class="form-select mb-2" multiple size="4">
+                <option value="first_aid">First Aid</option>
+                <option value="cooking">Cooking</option>
+                <option value="cleaning">Cleaning</option>
+                <option value="transport">Transport</option>
+                <option value="bilingual">Bilingual</option>
+                <option value="carpentry">Carpentry</option>
+                <option value="digital_marketing">Digital Marketing</option>
+                <option value="physical_trainer">Physical Trainer</option>
+            </select>
+        </div>
+        <div class="form-group mb-3">
+            <label>Urgency</label>
+            <select id="urgency" class="form-select" required>
+                <option value="" disabled ${!eventData.urgency ? 'selected' : ''}>Select urgency</option>
+                <option value="low" ${eventData.urgency === 'low' ? 'selected' : ''}>Low</option>
+                <option value="medium" ${eventData.urgency === 'medium' ? 'selected' : ''}>Medium</option>
+                <option value="high" ${eventData.urgency === 'high' ? 'selected' : ''}>High</option>
+            </select>
+        </div>
+        <div class="form-group mb-3">
+            <label>Date</label>
+            <input type="date" id="eventDate" class="form-control" value="${eventData.date}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">${mode === 'edit' ? 'Update' : 'Create'} Event</button>
+    `;
+
+    // Pre-select skills
+    const skillsSelect = form.querySelector('#requiredSkills');
+    for (const option of skillsSelect.options) {
+        if (eventData.skills.includes(option.value)) {
+            option.selected = true;
+        }
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            id: eventId,
+            name: form.eventName.value.trim(),
+            description: form.eventDescription.value.trim(),
+            location: form.eventLocation.value.trim(),
+            skills: Array.from(form.requiredSkills.selectedOptions).map(o => o.value),
+            urgency: form.urgency.value,
+            date: form.eventDate.value
+        };
+
+        const result = mode === 'edit'
+            ? await api.events.update(payload)
+            : await api.events.create(payload);
+
+        if (result.success) {
+            alert(`${mode === 'edit' ? 'Updated' : 'Created'} successfully!`);
+            navigate('/admin/events'); // Optional: redirect after save
+        } else {
+            alert('Error: ' + result.message);
+        }
+    });
+}
+
+
+// Handle all internal link clicks using the client-side router
+document.body.addEventListener('click', (e) => {
+  if (
+    e.target.tagName === 'A' &&
+    e.target.href.startsWith(location.origin)
+  ) {
+    e.preventDefault();
+    const path = new URL(e.target.href).pathname;
+    navigate(path);
+  }
 });

@@ -262,13 +262,47 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
 });
 
 // Get events assigned to the current user
-app.post('/api/profile/events', requireLogin, (req, res) => { });
+app.post('/api/profile/events', requireLogin, (req, res) => { 
+    const userId = req.userId;
+    const assigned = [];
+
+    for (const [eventId, volunteerIds] of Object.entries(eventAssignments)) {
+        if (volunteerIds.includes(userId)) {
+            assigned.push(events[eventId]);
+        }
+    }
+
+    // Log the request
+    console.log(`User ${userId} fetched ${assigned.length} assigned event(s)`);
+
+    res.sendApiOkay({ events: assigned });
+});
 
 // Get all events (admin only)
-app.get('/api/events', requireLogin, (req, res) => { });
+app.get('/api/events', requireLogin, (req, res) => { 
+    if (!req.user.is_admin) {
+        return res.sendApiError(403, 'unauthorized', 'Admin access required');
+    }
+
+    const allEvents = Object.values(events);
+
+    // Log the request
+    console.log(`Admin ${req.userId} fetched all events (${allEvents.length} total)`);
+
+    res.sendApiOkay({ events: allEvents });
+});
 
 // Get a single event (admin only)
-app.get('/api/events/event', requireLogin, (req, res) => { });
+app.get('/api/events/event', requireLogin, (req, res) => { 
+    const eventId = req.query.eventId;
+    const event = events[eventId];
+
+    if (!event) {
+        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    }
+
+    res.sendApiOkay({ event });
+});
 
 // Create new event (admin only)
 app.post('/api/events/create', requireLogin, (req, res) => {
@@ -278,7 +312,7 @@ app.post('/api/events/create', requireLogin, (req, res) => {
         return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
 
-    const eventId = crypto.randomUUID(); // generate unique event ID
+    const eventId = randomString(8, 'hex'); // shorter, readable ID
     events[eventId] = {
         id: eventId,
         name,
@@ -296,9 +330,9 @@ app.post('/api/events/create', requireLogin, (req, res) => {
 
 // Update existing event info (admin only)
 app.post('/api/events/update', requireLogin, (req, res) => {
-    const { eventId, name, description, location, skills, urgency, date } = req.body;
-
-    const event = events[eventId];
+    const { id, name, description, location, skills, urgency, date } = req.body;
+    const event = events[id];
+    
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
@@ -310,6 +344,8 @@ app.post('/api/events/update', requireLogin, (req, res) => {
     event.skills = skills;
     event.urgency = urgency;
     event.date = date;
+
+    console.log(`Updated event ${id}: ${name}`);
 
     res.sendApiOkay({ event });
 });
