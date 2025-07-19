@@ -449,15 +449,6 @@ const routes = [
         }
     }, */
 
-    /* // Admin event list (unused for now)
-    {
-        path: '/admin/events',
-        handler: () => {
-            const page = document.createElement('div');
-            // ...
-            render(page);
-        }
-    }, */
 
     // Admin event creation page
     {
@@ -663,34 +654,6 @@ const routes = [
         }
     },
 
-    /*
-    // Admin: List all events to edit
-    {
-    path: '/admin/events',
-    handler: async () => {
-        const page = document.createElement('div');
-        page.innerHTML = `<h2>Edit Events</h2><ul id="eventList" class="list-group"></ul>`;
-
-        try {
-        const response = await api.events.getAll();
-        const events = response.events;
-
-        const list = page.querySelector('#eventList');
-        events.forEach(ev => {
-            const item = document.createElement('li');
-            item.className = 'list-group-item';
-            item.innerHTML = `<a href="/admin/events/${ev.id}/edit">${ev.name}</a>`;
-            list.appendChild(item);
-        });
-        } catch (err) {
-        page.innerHTML = `<p class="text-danger">Failed to load events.</p>`;
-        console.error(err);
-        }
-
-        render(page);
-    }
-    },
-    */
 
     // Admin event volunteer matching page
     {
@@ -949,6 +912,11 @@ async function renderEventForm(mode, eventId = null) {
             return;
         }
         eventData = response.event;
+
+        if (eventData.date) {
+            const d = new Date(eventData.date);
+            eventData.date = d.toISOString().split('T')[0];
+        }
     }
 
     form.innerHTML = `
