@@ -124,7 +124,7 @@ const routes = [
                 msg.textContent = 'Registration successful! Redirecting to login...';
                 setTimeout(() => {
                     navigate('/login');
-                }, 1200);
+                }, 1000);
             });
             render(page);
         }
@@ -133,7 +133,52 @@ const routes = [
     // Email verification form
     {
         path: '/register/verify',
-        handler: () => { }
+        handler: () => {
+            const page = document.createElement('div');
+            // Get userId and email from query params
+            const url = new URL(window.location.href);
+            const userId = url.searchParams.get('userId') || '';
+            const email = url.searchParams.get('email') || '';
+            page.innerHTML = /*html*/`
+                <h2>Verify Your Email</h2>
+                <p>A verification code has been sent to: <strong>${email}</strong></p>
+                <form id="verifyEmailForm">
+                    <div class="form-group mb-3">
+                        <label for="verificationCode">Verification Code</label>
+                        <input type="text" id="verificationCode" class="form-control" placeholder="Enter the code sent to your email" maxlength="6" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Verify</button>
+                    <p id="verificationMessage" class="mt-2" style="color:red;"></p>
+                </form>
+            `;
+            const inputCode = page.querySelector('#verificationCode');
+            const verificationMessage = page.querySelector('#verificationMessage');
+            // submit event listener to the verification form
+            page.querySelector('#verifyEmailForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const code = inputCode.value.trim();
+                verificationMessage.textContent = '';
+                verificationMessage.style.color = '';
+                if (!userId || !email) {
+                    verificationMessage.textContent = 'Missing user information. Please use the verification link from your email.';
+                    verificationMessage.style.color = 'red';
+                    return;
+                }
+                // Call API for email verification
+                const data = await api.auth.verifyEmail(userId, email, code);
+                if (data.success) {
+                    verificationMessage.style.color = 'green';
+                    verificationMessage.textContent = 'Email verified! Redirecting to your profile...';
+                    setTimeout(() => {
+                        navigate('/profile');
+                    }, 1000);
+                } else {
+                    verificationMessage.style.color = 'red';
+                    verificationMessage.textContent = data.message || 'Verification failed.';
+                }
+            });
+            render(page);
+        }
     },
 
     // User login form
@@ -170,10 +215,25 @@ const routes = [
                 // Call API for login
                 const data = await api.auth.login(email, password);
                 if (data.success) {
-                    message.style.color = 'green';
-                    message.textContent = 'Login successful! Redirecting...';
+                    // Check if user is verified
+                    const userInfo = await api.auth.getCurrentUser();
+                    if (userInfo.is_email_verified) {
+                        message.style.color = 'green';
+                        message.textContent = 'Login successful! Redirecting...';
+                        setTimeout(() => {
+                            navigate('/profile');
+                        }, 1000);
+                    } else {
+                        // Should not happen, but fallback
+                        message.style.color = 'red';
+                        message.textContent = 'Email not verified. Please check your email.';
+                    }
+                } else if (data.code === 'email_not_verified') {
+                    // Redirect to verification page with userId/email
+                    message.style.color = 'orange';
+                    message.textContent = 'Email not verified. Redirecting to verification...';
                     setTimeout(() => {
-                        navigate('/profile');
+                        navigate(`/register/verify?userId=${encodeURIComponent(data.userId)}&email=${encodeURIComponent(data.email)}`);
                     }, 1000);
                 } else {
                     message.style.color = 'red';
@@ -187,7 +247,14 @@ const routes = [
     // User profile editor form
     {
         path: '/profile',
-        handler: () => {
+        handler: async () => {
+            // Check if user is verified before rendering profile
+            const userInfo = await api.auth.getCurrentUser();
+            if (!userInfo.is_email_verified) {
+                alert('Please verify your email before accessing your profile.');
+                navigate(`/register/verify?userId=${encodeURIComponent(userInfo.userId)}&email=${encodeURIComponent(userInfo.email)}`);
+                return;
+            }
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
                 <div class="container mt-5">
@@ -555,14 +622,14 @@ const routes = [
             renderEventForm('edit', params.eventId);
         }
     },
-    
+
 
     // Admin: List all events to edit
     {
         path: '/admin/events',
         handler: async () => {
             const page = document.createElement('div');
-            page.innerHTML = `<h2>Edit Events</h2><div id="eventList"></div>`;
+            page.innerHTML = `<h2>All Events</h2><div id="eventList"></div>`;
 
             const eventListDiv = page.querySelector('#eventList');
             const response = await api.events.getAll();
@@ -965,12 +1032,12 @@ async function renderEventForm(mode, eventId = null) {
 
 // Handle all internal link clicks using the client-side router
 document.body.addEventListener('click', (e) => {
-  if (
-    e.target.tagName === 'A' &&
-    e.target.href.startsWith(location.origin)
-  ) {
-    e.preventDefault();
-    const path = new URL(e.target.href).pathname;
-    navigate(path);
-  }
+    if (
+        e.target.tagName === 'A' &&
+        e.target.href.startsWith(location.origin)
+    ) {
+        e.preventDefault();
+        const path = new URL(e.target.href).pathname;
+        navigate(path);
+    }
 });

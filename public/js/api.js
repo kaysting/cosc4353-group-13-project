@@ -26,6 +26,10 @@ const api = {
                 return response;
             });
         },
+        getCurrentUser: async () => {
+            const token = localStorage.getItem('token');
+            return handleApiRequest(() => axios.get('/api/auth/me', { headers: { Authorization: token } }));
+        },
         logout: async () => {
             const token = localStorage.getItem('token');
             return handleApiRequest(async () => {
@@ -35,6 +39,10 @@ const api = {
                 return response;
             });
         },
+        // Add email verification API call
+        verifyEmail: (userId, email, code) => {
+            return handleApiRequest(() => axios.post('/api/auth/verify-email', { userId, email, code }));
+        }
     },
     profile: {
         get: () => {

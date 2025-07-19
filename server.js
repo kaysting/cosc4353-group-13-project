@@ -17,7 +17,7 @@ const isEmailValid = email => {
     return emailRegex.test(email);
 };
 
-const isZipValid = zip => /^\d{5}$/.test(zip);
+const isZipValid = zipCode => /^\d{5}$/.test(zipCode);
 const isDateValid = date => !isNaN(Date.parse(date));
 
 const randomString = (length, charset = 'base64') => {
@@ -63,8 +63,8 @@ function normalizeProfile(profile) {
         zipCode: profile.zipCode || '',
         skills: Array.isArray(profile.skills) ? profile.skills : [],
         preferences: profile.preferences || '',
-        availabilityStart: profile.availabilityStart ? new Date(profile.availabilityStart).toISOString().split('T')[0] : '',
-        availabilityEnd: profile.availabilityEnd ? new Date(profile.availabilityEnd).toISOString().split('T')[0] : ''
+        availability_dates: (profile.availabilityStart && profile.availabilityEnd) ?
+            [new Date(profile.availabilityStart).toISOString(), new Date(profile.availabilityEnd).toISOString()] : []
     };
 }
 
@@ -180,25 +180,31 @@ const sendVerificationEmail = async (email) => {
     );
 };
 
-const addVolunteerHistory = (userId, eventId) => {
-    if (!volunteerHistory[userId]) {
-        volunteerHistory[userId] = [];
+// Middleware to check for valid session token and error out if not valid or present
+const requireLogin = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) {
+        return res.sendApiError(401, 'missing_token', 'Authorization token is required');
     }
+    const userId = sessions[token];
+    if (!userId) {
+        return res.sendApiError(401, 'invalid_token', 'Authorization token is invalid or expired');
+    }
+    req.userId = userId;
+    req.user = users[userId];
+    req.profile = userProfiles[userId];
+    if (!req.user) {
+        return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
+    }
+    next();
+};
 
-    const event = events[eventId];
-    if (!event) return;
-
-    volunteerHistory[userId].push({
-        eventId: eventId,
-        eventName: event.name,
-        description: event.description,
-        location: event.location,
-        requiredSkills: event.skills,
-        urgency: event.urgency,
-        date: event.date,
-        status: 'Assigned',
-        assignedAt: new Date().toISOString()
-    });
+// Middleware to require the user to be an admin
+const requireAdmin = (req, res, next) => {
+    if (!req.user.is_admin) {
+        return res.sendApiError(403, 'unauthorized', 'Admin access required');
+    }
+    next();
 };
 
 // Use Express' built-in JSON parser
@@ -227,6 +233,9 @@ app.use(express.static('public'));
 app.post('/api/auth/register', async (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
+    if (!password || !email) {
+        return res.sendApiError(400, 'missing_params', 'Email and password are required');
+    }
     if (!isEmailValid(email)) {
         return res.sendApiError(400, 'invalid_email', 'Email address is not valid');
     }
@@ -238,31 +247,29 @@ app.post('/api/auth/register', async (req, res) => {
             return res.sendApiError(400, 'email_in_use', 'An account with that email address already exists');
         }
     }
-    const userId = crypto.randomUUID();
+    const userId = randomString(8, 'hex');
     const passwordHash = await hashPassword(password);
     users[userId] = normalizeUser({
         email,
-        password_hash: passwordHash
+        password_hash: passwordHash,
+        is_email_verified: false // Explicitly set to false
     });
     userProfiles[userId] = normalizeProfile({});
     // Send welcome notification
     sendNotification(userId,
         'Welcome to Volunteer Platform!',
-        'Thank you for registering. Please complete your profile to get started with volunteering opportunities.'
+        'Thanks for registering! Please log in, verify your email address, and complete your profile to get started. Looking forward to your contributions!'
     );
-
-    // Send verification email
-    if (config.mailgun_api_key) {
-        sendVerificationEmail(email).catch(err => {
-            console.error(`Failed to send verification email to ${email}:`, err);
-        });
-    }
     console.log(`Created user ${userId} (${email})`);
+    res.sendApiOkay({ user: users[userId] });
 });
 
 // Log into account with username/email and password, returns a session token
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
+    if (!password || !email) {
+        return res.sendApiError(400, 'missing_params', 'Email and password are required');
+    }
     if (!isEmailValid(email)) {
         return res.sendApiError(400, 'invalid_email', 'Email address is not valid');
     }
@@ -282,39 +289,46 @@ app.post('/api/auth/login', async (req, res) => {
     if (!valid) {
         return res.sendApiError(401, 'invalid_credentials', 'Invalid email or password');
     }
+    if (!user.is_email_verified) {
+        // Send verification code again
+        if (config.mailgun_api_key) {
+            sendVerificationEmail(user.email).catch(err => {
+                console.error(`Failed to send verification email to ${user.email}:`, err);
+            });
+        }
+        return res.status(403).json({
+            success: false,
+            code: 'email_not_verified',
+            message: 'Email not verified. Please check your email for a verification code.',
+            userId,
+            email: user.email
+        });
+    }
     const token = randomString(64, 'base64');
     sessions[token] = userId;
-    res.sendApiOkay({ token });
+    res.sendApiOkay({ token, userId, email: user.email });
 });
 
-// Middleware to check for valid session token and error out if not valid or present
-const requireLogin = (req, res, next) => {
-    const token = req.headers['authorization'];
-    if (!token) {
-        return res.sendApiError(401, 'missing_token', 'Authorization token is required');
-    }
-    const userId = sessions[token];
-    if (!userId) {
-        return res.sendApiError(401, 'invalid_token', 'Authorization token is invalid or expired');
-    }
-    req.userId = userId;
-    req.user = users[userId];
-    req.profile = userProfiles[userId];
-    if (!req.user) {
-        return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
-    }
-    next();
-};
-
-const requireAdmin = (req, res, next) => {
-    if (!req.user.is_admin) {
-        return res.sendApiError(403, 'unauthorized', 'Admin access required');
-    }
-    next();
-};
+// Endpoint to get current user info (for client-side checks)
+app.get('/api/auth/me', requireLogin, (req, res) => {
+    res.sendApiOkay({
+        userId: req.userId,
+        email: req.user.email,
+        is_email_verified: req.user.is_email_verified,
+        is_admin: req.user.is_admin
+    });
+});
 
 // Log out and delete the current session token
-app.post('/api/auth/logout', requireLogin, (req, res) => { });
+app.post('/api/auth/logout', requireLogin, (req, res) => {
+    const token = req.headers['authorization'];
+    if (sessions[token]) {
+        delete sessions[token];
+        res.sendApiOkay();
+    } else {
+        res.sendApiError(400, 'invalid_token', 'Session token is invalid or expired');
+    }
+});
 
 // Get current user profile info
 app.get('/api/profile', requireLogin, (req, res) => {
@@ -337,7 +351,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         availabilityEnd
     } = req.body;
     //Make sure zip code is of 5 char length 
-    if (zip && !isZipValid(zip)) {
+    if (zipCode && !isZipValid(zipCode)) {
         return res.sendApiError(400, 'invalid_zip', 'Zip code must be 5 digits');
     }
     // Validate all availability_dates
@@ -346,7 +360,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
             return res.sendApiError(400, 'invalid_date', 'Start or end date is invalid');
         }
         if (new Date(availabilityEnd) < new Date(availabilityStart)) {
-            return res.sendApiError(400, 'invalid_range','End date cannot be earlier than start date.');
+            return res.sendApiError(400, 'invalid_range', 'End date cannot be earlier than start date.');
         }
     }
     //Update the User Profile
@@ -582,12 +596,37 @@ app.get('/api/history', requireLogin, (req, res) => {
     });
     res.sendApiOkay({ history });
 });
+
+// Endpoint to verify email with code, userId, and email (no login required)
+app.post('/api/auth/verify-email', (req, res) => {
+    const { userId, email, code } = req.body;
+    if (!userId || !email || !code) {
+        return res.sendApiError(400, 'missing_params', 'User ID, email, and code are required');
+    }
+    if (!emailVerificationCodes[code]) {
+        return res.sendApiError(400, 'invalid_code', 'Verification code is invalid or expired');
+    }
+    if (emailVerificationCodes[code].toLowerCase() !== email.toLowerCase()) {
+        return res.sendApiError(400, 'code_email_mismatch', 'Verification code does not match email');
+    }
+    if (!users[userId] || users[userId].email.toLowerCase() !== email.toLowerCase()) {
+        return res.sendApiError(404, 'user_not_found', 'User not found for this code and email');
+    }
+    users[userId].is_email_verified = true; // Ensure this is set on verify
+    delete emailVerificationCodes[code];
+    res.sendApiOkay({ message: 'Email verified successfully!' });
+});
+
 // Catch-all route to serve the index.html file for any unmatched routes
 app.use((req, res) => {
     res.sendFile(__dirname + '/public/index.html');
 });
 
 // Start the server
-app.listen(config.server_port, () => {
+const appRunning = app.listen(config.server_port, () => {
     console.log(`Server is running at http://localhost:${config.server_port}`);
 });
+
+module.exports = {
+    app: appRunning, users, emailVerificationCodes
+};
