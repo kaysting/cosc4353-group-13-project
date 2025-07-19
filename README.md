@@ -26,3 +26,129 @@ The software must include the following components:
 1. Volunteer Matching (A module that matches volunteers to events/tasks based on their profiles and the event requirements)
 1. Notification System (Send notifications to volunteers for event assignments, updates, and reminders)
 1. Volunteer History (Track volunteer participation history and performance)
+
+---
+
+## API Documentation
+
+All endpoints are prefixed with `/api/`. All requests and responses are in JSON. Some endpoints require authentication via an `Authorization` header containing a valid session token.
+
+### Authentication
+
+#### POST `/api/auth/register`
+Register a new user.
+- **Body:** `{ email: string, password: string }`
+- **Responses:**
+  - `200 OK` `{ success: true, user: { ... } }`
+  - `400` for missing/invalid fields, duplicate email, weak password
+
+#### POST `/api/auth/login`
+Login with email and password.
+- **Body:** `{ email: string, password: string }`
+- **Responses:**
+  - `200 OK` `{ success: true, token, userId, email }`
+  - `403` if email not verified (`code: 'email_not_verified'`)
+  - `401/400` for invalid credentials or missing fields
+
+#### POST `/api/auth/logout`
+Logout the current session.
+- **Headers:** `Authorization: <token>`
+- **Responses:**
+  - `200 OK` `{ success: true }`
+  - `400/401` for invalid/missing token
+
+#### POST `/api/auth/verify-email`
+Verify a user's email with a code.
+- **Body:** `{ userId: string, email: string, code: string }`
+- **Responses:**
+  - `200 OK` `{ success: true, message }`
+  - `400/404` for missing/invalid params, code mismatch, or user not found
+
+#### GET `/api/auth/me`
+Get current user info (requires login).
+- **Headers:** `Authorization: <token>`
+- **Responses:** `{ success: true, userId, email, is_email_verified, is_admin }`
+
+---
+
+### User Profile
+
+#### GET `/api/profile`
+Get the current user's profile.
+- **Headers:** `Authorization: <token>`
+- **Responses:** `{ success: true, profile: { ... } }`
+
+#### POST `/api/profile/update`
+Update the current user's profile.
+- **Headers:** `Authorization: <token>`
+- **Body:** `{ fullName, address1, address2, city, state, zipCode, skills, preferences, availabilityStart, availabilityEnd }`
+- **Responses:**
+  - `200 OK` `{ success: true, message }`
+  - `400` for invalid zip, date, or range
+
+#### POST `/api/profile/events`
+Get events assigned to the current user.
+- **Headers:** `Authorization: <token>`
+- **Responses:** `{ success: true, events: [ ... ] }`
+
+---
+
+### Events (Admin Only)
+
+#### GET `/api/events`
+Get all events (admin only).
+- **Headers:** `Authorization: <admin token>`
+- **Responses:** `{ success: true, events: [ ... ] }`
+
+#### POST `/api/events/create`
+Create a new event (admin only).
+- **Headers:** `Authorization: <admin token>`
+- **Body:** `{ name, description, location, skills, urgency, date }`
+- **Responses:** `{ success: true, event: { ... } }`
+
+#### POST `/api/events/update`
+Update an event (admin only).
+- **Headers:** `Authorization: <admin token>`
+- **Body:** `{ id, name, description, location, skills, urgency, date }`
+- **Responses:** `{ success: true, event: { ... } }`
+
+#### GET `/api/events/event?eventId=...`
+Get a single event by ID.
+- **Headers:** `Authorization: <token>`
+- **Query:** `eventId`
+- **Responses:** `{ success: true, event: { ... } }`
+
+#### GET `/api/events/match/check?eventId=...`
+Get volunteers matching an event (admin only).
+- **Headers:** `Authorization: <admin token>`
+- **Query:** `eventId`
+- **Responses:** `{ success: true, volunteers: [ ... ] }`
+
+#### POST `/api/events/match/assign`
+Assign a volunteer to an event (admin only).
+- **Headers:** `Authorization: <admin token>`
+- **Body:** `{ eventId, volunteerId }`
+- **Responses:** `{ success: true, message }`
+
+---
+
+### Notifications & History
+
+#### GET `/api/notifications`
+Get notifications for the current user.
+- **Headers:** `Authorization: <token>`
+- **Responses:** `{ success: true, notifications: [ ... ] }`
+
+#### GET `/api/history`
+Get volunteer history for the current user.
+- **Headers:** `Authorization: <token>`
+- **Responses:** `{ success: true, history: [ ... ] }`
+
+---
+
+### Error Handling
+All error responses have the form:
+```
+{ success: false, code: string, message: string }
+```
+See test cases for possible error codes.
