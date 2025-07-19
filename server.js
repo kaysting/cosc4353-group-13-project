@@ -414,8 +414,11 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
     if (!name || !description || !location || !Array.isArray(skills) || !urgency || !date) {
         return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
+
     const eventId = randomString(8, 'hex'); // shorter, readable ID
-    events[eventId] = normalizeEvent({
+
+    // Add eventId into the object before normalization
+    const rawEvent = {
         id: eventId,
         name,
         description,
@@ -424,21 +427,31 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
         urgency,
         date,
         createdBy: req.userId
-    });
+    };
+
+    events[eventId] = normalizeEvent(rawEvent); // This now includes ID correctly
+
     console.log(`Created event ${eventId}: ${name}`);
     res.sendApiOkay({ event: events[eventId] });
 });
 
 // Update existing event info (admin only)
 app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
-    const { id, name, description, location, skills, urgency, date } = req.body;
-    const event = events[id];
+    const eventId = (req.body.id || '').trim(); // Normalize
+    const { name, description, location, skills, urgency, date } = req.body;
+
+    console.log('Incoming update request with eventId:', eventId); //////////
+    console.log('Available event keys:', Object.keys(events)); ////////////
+
+
+    const event = events[eventId];
     if (!event) {
+        console.log('Event not found with ID:', eventId); ////////////
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
-    // Update event details
+
     Object.assign(event, normalizeEvent({
-        id,
+        id: eventId,
         name,
         description,
         location,
@@ -447,10 +460,12 @@ app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
         date,
         createdBy: event.createdBy
     }));
-    console.log(`Updated event ${id}: ${name}`);
+
+    console.log(`Updated event ${eventId}: ${name}`);
+
     // Notify assigned volunteers about the update
-    if (eventAssignments[id]) {
-        eventAssignments[id].forEach(volunteerId => {
+    if (eventAssignments[eventId]) {
+        eventAssignments[eventId].forEach(volunteerId => {
             sendNotification(volunteerId,
                 'Event Updated',
                 `The event "${event.name}" you're assigned to has been updated. Please check the event details.`

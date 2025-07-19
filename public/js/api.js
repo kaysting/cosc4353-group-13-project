@@ -63,9 +63,9 @@ const api = {
             const token = localStorage.getItem('token');
             return handleApiRequest(() => axios.post('/api/events/create', eventInfo, { headers: { Authorization: token } }));
         },
-        update: (eventId, eventInfo) => {
+        update: (eventInfo) => {
             const token = localStorage.getItem('token');
-            return handleApiRequest(() => axios.post('/api/events/update', { eventId, ...eventInfo }, { headers: { Authorization: token } }));
+            return handleApiRequest(() => axios.post('/api/events/update', eventInfo, {headers: { Authorization: token }}));
         },
         matchCheck: (eventId) => {
             const token = localStorage.getItem('token');
