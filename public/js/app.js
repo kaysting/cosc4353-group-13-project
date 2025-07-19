@@ -453,7 +453,16 @@ const routes = [
     // Admin event creation page
     {
         path: '/admin/events/create',
-        handler: () => {
+        handler: async () => {
+
+            const currentUser = await api.auth.getCurrentUser();
+            if (!currentUser || !currentUser.is_admin) {
+                const page = document.createElement('div');
+                page.innerHTML = `<h2>Create Event</h2><p class="text-danger">Access denied. Admins only.</p>`;
+                render(page);
+                return;
+            }
+
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
             <h2>Create Event</h2>
