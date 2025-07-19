@@ -912,6 +912,11 @@ async function renderEventForm(mode, eventId = null) {
             return;
         }
         eventData = response.event;
+
+        if (eventData.date) {
+            const d = new Date(eventData.date);
+            eventData.date = d.toISOString().split('T')[0];
+        }
     }
 
     form.innerHTML = `
