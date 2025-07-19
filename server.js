@@ -63,7 +63,7 @@ function normalizeProfile(profile) {
         zipCode: profile.zipCode || '',
         skills: Array.isArray(profile.skills) ? profile.skills : [],
         preferences: profile.preferences || '',
-        availability_dates: (profile.availabilityStart && profile.availabilityEnd) ? 
+        availability_dates: (profile.availabilityStart && profile.availabilityEnd) ?
             [new Date(profile.availabilityStart).toISOString(), new Date(profile.availabilityEnd).toISOString()] : []
     };
 }
@@ -196,19 +196,6 @@ const requireLogin = (req, res, next) => {
     if (!req.user) {
         return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
     }
-    // Block access to protected endpoints if not verified, except for verification and logout
-    if (!req.user.is_email_verified &&
-        !req.path.startsWith('/api/auth/verify-email') &&
-        !req.path.startsWith('/api/auth/logout') &&
-        !req.path.startsWith('/api/auth/me')) {
-        return res.status(403).json({
-            success: false,
-            code: 'email_not_verified',
-            message: 'Email not verified. Please check your email for a verification code.',
-            userId: req.userId,
-            email: req.user.email
-        });
-    }
     next();
 };
 
@@ -246,6 +233,9 @@ app.use(express.static('public'));
 app.post('/api/auth/register', async (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
+    if (!password || !email) {
+        return res.sendApiError(400, 'missing_params', 'Email and password are required');
+    }
     if (!isEmailValid(email)) {
         return res.sendApiError(400, 'invalid_email', 'Email address is not valid');
     }
@@ -277,6 +267,9 @@ app.post('/api/auth/register', async (req, res) => {
 // Log into account with username/email and password, returns a session token
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
+    if (!password || !email) {
+        return res.sendApiError(400, 'missing_params', 'Email and password are required');
+    }
     if (!isEmailValid(email)) {
         return res.sendApiError(400, 'invalid_email', 'Email address is not valid');
     }
@@ -327,7 +320,15 @@ app.get('/api/auth/me', requireLogin, (req, res) => {
 });
 
 // Log out and delete the current session token
-app.post('/api/auth/logout', requireLogin, (req, res) => { });
+app.post('/api/auth/logout', requireLogin, (req, res) => {
+    const token = req.headers['authorization'];
+    if (sessions[token]) {
+        delete sessions[token];
+        res.sendApiOkay();
+    } else {
+        res.sendApiError(400, 'invalid_token', 'Session token is invalid or expired');
+    }
+});
 
 // Get current user profile info
 app.get('/api/profile', requireLogin, (req, res) => {
@@ -359,7 +360,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
             return res.sendApiError(400, 'invalid_date', 'Start or end date is invalid');
         }
         if (new Date(availabilityEnd) < new Date(availabilityStart)) {
-            return res.sendApiError(400, 'invalid_range','End date cannot be earlier than start date.');
+            return res.sendApiError(400, 'invalid_range', 'End date cannot be earlier than start date.');
         }
     }
     //Update the User Profile
@@ -607,6 +608,10 @@ app.use((req, res) => {
 });
 
 // Start the server
-app.listen(config.server_port, () => {
+const appRunning = app.listen(config.server_port, () => {
     console.log(`Server is running at http://localhost:${config.server_port}`);
 });
+
+module.exports = {
+    app: appRunning, users, emailVerificationCodes
+};
