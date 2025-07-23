@@ -6,6 +6,8 @@ const formData = require('form-data');
 const Mailgun = require('mailgun.js');
 const config = require('./config.json');
 
+const db = require('./db.js');
+
 const mailgun = new Mailgun(formData);
 const mg = mailgun.client({
     username: 'api',
