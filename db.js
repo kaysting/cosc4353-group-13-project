@@ -89,4 +89,5 @@ process.on('exit', () => {
 });
 process.on('SIGINT', () => {
     db.close();
+    process.exit(0); //added this so that the connection would close properly with ctrl+c, feel free to remove.
 });

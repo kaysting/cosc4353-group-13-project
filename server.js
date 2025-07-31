@@ -65,8 +65,8 @@ function normalizeProfile(profile) {
         zipCode: profile.zipCode || '',
         skills: Array.isArray(profile.skills) ? profile.skills : [],
         preferences: profile.preferences || '',
-        availability_dates: (profile.availabilityStart && profile.availabilityEnd) ?
-            [new Date(profile.availabilityStart).toISOString(), new Date(profile.availabilityEnd).toISOString()] : []
+        availabilityStart: profile.availabilityStart || '',
+        availabilityEnd: profile.availabilityEnd || ''
     };
 }
 
@@ -334,8 +334,33 @@ app.post('/api/auth/logout', requireLogin, (req, res) => {
 
 // Get current user profile info
 app.get('/api/profile', requireLogin, (req, res) => {
-    const profile = normalizeProfile(req.profile);
-    res.sendApiOkay({ profile });
+    try {
+        const row = db.prepare(`
+            SELECT full_name, address_1, address_2, city, state, zip_code, preferences, availability_start, availability_end
+            FROM user_profiles
+            WHERE user_id = ?
+        `).get(req.userId);
+        const skills = db.prepare(`
+            SELECT skill FROM user_skills WHERE user_id = ?
+        `).all(req.userId).map(row => row.skill);
+
+        const profile = {
+            fullName: row?.full_name || '',
+            address1: row?.address_1 || '',
+            address2: row?.address_2 || '',
+            city: row?.city || '',
+            state: row?.state || '',
+            zipCode: row?.zip_code || '',
+            preferences: row?.preferences || '',
+            availabilityStart: row?.availability_start || '',
+            availabilityEnd: row?.availability_end || '',
+            skills
+        }
+        res.sendApiOkay({ profile });
+    } catch (err) {
+        console.error(err);
+        res.sendApiError(500, 'db_error', 'Failed to load user profile');
+    }
 });
 
 // Update current user profile info
@@ -365,20 +390,53 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
             return res.sendApiError(400, 'invalid_range', 'End date cannot be earlier than start date.');
         }
     }
-    //Update the User Profile
-    userProfiles[req.userId] = normalizeProfile({
-        fullName,
-        address1,
-        address2,
-        city,
-        state,
-        zipCode,
-        skills,
-        preferences,
-        availabilityStart,
-        availabilityEnd
-    });
-    res.sendApiOkay({ message: 'Profile updated successfully!' });
+    
+    try {
+        const stmt = db.prepare(`
+            INSERT INTO user_profiles (user_id, full_name, address_1, address_2, city, state, zip_code, preferences, availability_start, availability_end)
+            VALUES (@user_id, @fullName, @address1, @address2, @city, @state, @zipCode, @preferences, @availabilityStart, @availabilityEnd)
+            ON CONFLICT(user_id) DO UPDATE SET
+                full_name=@fullName,
+                address_1=@address1,
+                address_2=@address2,
+                city=@city,
+                state=@state,
+                zip_code=@zipCode,
+                preferences=@preferences,
+                availability_start=@availabilityStart,
+                availability_end=@availabilityEnd
+            `);
+        const userExists = db.prepare(`SELECT 1 FROM users WHERE id = ?`).get(req.userId);
+        if(!userExists){
+            return res.status(400).send('User does not exist!');
+        }    
+        stmt.run({
+            user_id: req.userId,
+            fullName,
+            address1,
+            address2,
+            city,
+            state,
+            zipCode,
+            preferences,
+            availabilityStart,
+            availabilityEnd
+        });
+
+        // Replacing skills (done by deleting and inserting)
+        db.prepare(`DELETE FROM user_skills WHERE user_id = ?`).run(req.userId);
+
+        const insertSkill = db.prepare(`INSERT INTO user_skills (user_id, skill) VALUES (?, ?)`);
+        if (Array,isArray(skills)) {
+            for (const skill of skills) {
+                insertSkill.run(req.userId, skill);
+            }
+        }
+        res.sendApiOkay({ message: 'Profile updated successfully!' });
+    } catch (err) {
+        console.error(err);
+        res.sendApiError(500, 'db_error', 'Failed to update profile')
+    }
 });
 
 // Get events assigned to the current user
