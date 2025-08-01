@@ -105,31 +105,10 @@ function normalizeHistoryEntry(entry) {
 }
 
 // In-memory data maps to act as database for now
-const users = {}; // userId -> user account (email, password_hash, is_email_verified, is_admin)
-const userProfiles = {}; // userId -> user profile
-const sessions = {};
 const events = {};
 const notifications = {};
 const volunteerHistory = {};
 const eventAssignments = {};
-const emailVerificationCodes = {};
-
-// Create temporary admin user
-(async () => {
-    const adminUserId = randomString(8, 'hex');
-    const adminUserEmail = 'admin@example.com';
-    const adminUserPassword = 'adminpassword';
-    users[adminUserId] = normalizeUser({
-        email: adminUserEmail,
-        password_hash: await hashPassword(adminUserPassword),
-        is_email_verified: true,
-        is_admin: true
-    });
-    userProfiles[adminUserId] = normalizeProfile({
-        name: 'Admin User'
-    });
-    console.log(`Created temp admin user with ID: ${adminUserId}, Email: ${adminUserEmail}, Password: ${adminUserPassword}`);
-})();
 
 const sendNotification = (recipientId, header, description, time = Date.now()) => {
     if (!notifications[recipientId]) {
@@ -147,7 +126,7 @@ const sendNotification = (recipientId, header, description, time = Date.now()) =
     notifications[recipientId].push(notification);
 
     // Send email notification if user exists and email is verified
-    const user = users[recipientId];
+    const user = db.prepare('SELECT email, is_email_verified FROM users WHERE id = ?').get(recipientId);
     if (user && user.is_email_verified) {
         sendEmail(
             'Volunteer Platform',
@@ -172,7 +151,7 @@ const sendEmail = async (senderName, to, subject, text) => {
 
 const sendVerificationEmail = async (email) => {
     const code = randomString(6, 'numeric');
-    emailVerificationCodes[code] = email;
+    db.prepare('INSERT INTO email_verification_codes (code, email) VALUES (?, ?)').run(code, email);
     console.log(`Generated email verification code ${code} for ${email}`);
     await sendEmail(
         'Volunteer Platform',
@@ -188,16 +167,18 @@ const requireLogin = (req, res, next) => {
     if (!token) {
         return res.sendApiError(401, 'missing_token', 'Authorization token is required');
     }
-    const userId = sessions[token];
-    if (!userId) {
+    const session = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
+    if (!session) {
         return res.sendApiError(401, 'invalid_token', 'Authorization token is invalid or expired');
     }
-    req.userId = userId;
-    req.user = users[userId];
-    req.profile = userProfiles[userId];
+    req.userId = session.user_id;
+    req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
     if (!req.user) {
         return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
     }
+    const profileRow = db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(req.userId);
+    const skills = db.prepare('SELECT skill FROM user_skills WHERE user_id = ?').all(req.userId).map(row => row.skill);
+    req.profile = { ...(profileRow || {}), skills };
     next();
 };
 
@@ -231,7 +212,6 @@ app.use((req, res, next) => {
 app.use(express.static('public'));
 
 // Create new account
-// Accounts should be stored in an in-memory object for now
 app.post('/api/auth/register', async (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
@@ -244,26 +224,37 @@ app.post('/api/auth/register', async (req, res) => {
     if (password.length < 8) {
         return res.sendApiError(400, 'weak_password', 'Password must be at least 8 characters long');
     }
-    for (const userId in users) {
-        if (users[userId].email.toLowerCase() === email.toLowerCase()) {
-            return res.sendApiError(400, 'email_in_use', 'An account with that email address already exists');
-        }
+    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existingUser) {
+        return res.sendApiError(400, 'email_in_use', 'An account with that email address already exists');
     }
     const userId = randomString(8, 'hex');
     const passwordHash = await hashPassword(password);
-    users[userId] = normalizeUser({
+
+    const user = {
+        id: userId,
         email,
         password_hash: passwordHash,
-        is_email_verified: false // Explicitly set to false
-    });
-    userProfiles[userId] = normalizeProfile({});
+        is_email_verified: 0,
+        is_admin: 0
+    };
+
+    db.prepare('INSERT INTO users (id, email, password_hash, is_email_verified, is_admin) VALUES (@id, @email, @password_hash, @is_email_verified, @is_admin)').run(user);
+
+    // Send verification email
+    if (config.mailgun_api_key) {
+        sendVerificationEmail(email).catch(err => {
+            console.error(`Failed to send verification email to ${email}:`, err);
+        });
+    }
+
     // Send welcome notification
     sendNotification(userId,
         'Welcome to Volunteer Platform!',
         'Thanks for registering! Please log in, verify your email address, and complete your profile to get started. Looking forward to your contributions!'
     );
     console.log(`Created user ${userId} (${email})`);
-    res.sendApiOkay({ user: users[userId] });
+    res.sendApiOkay({ user });
 });
 
 // Log into account with username/email and password, returns a session token
@@ -275,15 +266,9 @@ app.post('/api/auth/login', async (req, res) => {
     if (!isEmailValid(email)) {
         return res.sendApiError(400, 'invalid_email', 'Email address is not valid');
     }
-    let userId = null;
-    let user = null;
-    for (const id in users) {
-        if (users[id].email.toLowerCase() === email.toLowerCase()) {
-            userId = id;
-            user = users[id];
-            break;
-        }
-    }
+
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
     if (!user) {
         return res.sendApiError(401, 'invalid_credentials', 'Invalid email or password');
     }
@@ -302,13 +287,13 @@ app.post('/api/auth/login', async (req, res) => {
             success: false,
             code: 'email_not_verified',
             message: 'Email not verified. Please check your email for a verification code.',
-            userId,
+            userId: user.id,
             email: user.email
         });
     }
     const token = randomString(64, 'base64');
-    sessions[token] = userId;
-    res.sendApiOkay({ token, userId, email: user.email });
+    db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
+    res.sendApiOkay({ token, userId: user.id, email: user.email });
 });
 
 // Endpoint to get current user info (for client-side checks)
@@ -324,12 +309,8 @@ app.get('/api/auth/me', requireLogin, (req, res) => {
 // Log out and delete the current session token
 app.post('/api/auth/logout', requireLogin, (req, res) => {
     const token = req.headers['authorization'];
-    if (sessions[token]) {
-        delete sessions[token];
-        res.sendApiOkay();
-    } else {
-        res.sendApiError(400, 'invalid_token', 'Session token is invalid or expired');
-    }
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    res.sendApiOkay();
 });
 
 // Get current user profile info
@@ -355,7 +336,7 @@ app.get('/api/profile', requireLogin, (req, res) => {
             availabilityStart: row?.availability_start || '',
             availabilityEnd: row?.availability_end || '',
             skills
-        }
+        };
         res.sendApiOkay({ profile });
     } catch (err) {
         console.error(err);
@@ -390,7 +371,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
             return res.sendApiError(400, 'invalid_range', 'End date cannot be earlier than start date.');
         }
     }
-    
+
     try {
         const stmt = db.prepare(`
             INSERT INTO user_profiles (user_id, full_name, address_1, address_2, city, state, zip_code, preferences, availability_start, availability_end)
@@ -407,9 +388,9 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
                 availability_end=@availabilityEnd
             `);
         const userExists = db.prepare(`SELECT 1 FROM users WHERE id = ?`).get(req.userId);
-        if(!userExists){
+        if (!userExists) {
             return res.status(400).send('User does not exist!');
-        }    
+        }
         stmt.run({
             user_id: req.userId,
             fullName,
@@ -427,7 +408,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         db.prepare(`DELETE FROM user_skills WHERE user_id = ?`).run(req.userId);
 
         const insertSkill = db.prepare(`INSERT INTO user_skills (user_id, skill) VALUES (?, ?)`);
-        if (Array,isArray(skills)) {
+        if (Array, isArray(skills)) {
             for (const skill of skills) {
                 insertSkill.run(req.userId, skill);
             }
@@ -435,7 +416,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         res.sendApiOkay({ message: 'Profile updated successfully!' });
     } catch (err) {
         console.error(err);
-        res.sendApiError(500, 'db_error', 'Failed to update profile')
+        res.sendApiError(500, 'db_error', 'Failed to update profile');
     }
 });
 
@@ -501,9 +482,9 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
     }
 
     const result = db.prepare(`
-        INSERT INTO events (name, description, location, urgency, date, created_by)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, description, location, urgency, date, req.userId);
+        INSERT INTO events (id, name, description, location, urgency, date, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(randomString(8, 'hex'), name, description, location, urgency, date, req.userId);
 
     const eventId = result.lastInsertRowid;
 
@@ -682,17 +663,19 @@ app.post('/api/auth/verify-email', (req, res) => {
     if (!userId || !email || !code) {
         return res.sendApiError(400, 'missing_params', 'User ID, email, and code are required');
     }
-    if (!emailVerificationCodes[code]) {
+    const verificationEntry = db.prepare('SELECT email FROM email_verification_codes WHERE code = ?').get(code);
+    if (!verificationEntry) {
         return res.sendApiError(400, 'invalid_code', 'Verification code is invalid or expired');
     }
-    if (emailVerificationCodes[code].toLowerCase() !== email.toLowerCase()) {
+    if (verificationEntry.email.toLowerCase() !== email.toLowerCase()) {
         return res.sendApiError(400, 'code_email_mismatch', 'Verification code does not match email');
     }
-    if (!users[userId] || users[userId].email.toLowerCase() !== email.toLowerCase()) {
+    const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(userId);
+    if (!user || user.email.toLowerCase() !== email.toLowerCase()) {
         return res.sendApiError(404, 'user_not_found', 'User not found for this code and email');
     }
-    users[userId].is_email_verified = true; // Ensure this is set on verify
-    delete emailVerificationCodes[code];
+    db.prepare('UPDATE users SET is_email_verified = 1 WHERE id = ?').run(userId);
+    db.prepare('DELETE FROM email_verification_codes WHERE code = ?').run(code);
     res.sendApiOkay({ message: 'Email verified successfully!' });
 });
 
@@ -707,5 +690,5 @@ const appRunning = app.listen(config.server_port, () => {
 });
 
 module.exports = {
-    app: appRunning, users, emailVerificationCodes
+    app: appRunning
 };

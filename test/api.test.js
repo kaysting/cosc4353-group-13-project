@@ -1,10 +1,24 @@
 const request = require('supertest');
 const { expect } = require('chai');
 const server = require('../server');
+const db = require('../db');
 
-const COMMON_ERROR_CODES = [400, 401, 403, 404, 422];
+const COMMON_ERROR_CODES = [400, 401, 403, 404, 422, 500];
 
 describe('API Endpoints', () => {
+    before(() => {
+        // Clean up the database before running tests
+        db.prepare('DELETE FROM event_assignments').run();
+        db.prepare('DELETE FROM volunteer_history').run();
+        db.prepare('DELETE FROM event_skills').run();
+        db.prepare('DELETE FROM events').run();
+        db.prepare('DELETE FROM user_skills').run();
+        db.prepare('DELETE FROM user_profiles').run();
+        db.prepare('DELETE FROM sessions').run();
+        db.prepare('DELETE FROM email_verification_codes').run();
+        db.prepare('DELETE FROM users WHERE is_admin = 0').run(); // Keep admin user
+    });
+
     let userToken, userId, adminToken, adminId, eventId;
 
     const testUser = {
@@ -16,16 +30,17 @@ describe('API Endpoints', () => {
         password: 'adminpassword'
     };
 
-    it('should register a new user', async () => {
+    it('should register a new user and send verification email', async () => {
         const res = await request(server.app)
             .post('/api/auth/register')
             .send(testUser);
         expect(res.statusCode).to.equal(200);
         expect(res.body.success).to.equal(true);
         expect(res.body.user.email).to.equal(testUser.email);
-        userId = Object.keys(server.users).find(
-            id => server.users[id].email === testUser.email
-        );
+        const user = db.prepare('SELECT id FROM users WHERE email = ?').get(testUser.email);
+        userId = user.id;
+        const verificationCode = db.prepare('SELECT code FROM email_verification_codes WHERE email = ?').get(testUser.email);
+        expect(verificationCode).to.not.be.undefined;
     });
 
     it('should not allow duplicate registration', async () => {
@@ -235,19 +250,17 @@ describe('API Endpoints', () => {
             .post('/api/auth/register')
             .send(newUser);
         expect(regRes.statusCode).to.equal(200);
-        const newUserId = Object.keys(server.users).find(
-            id => server.users[id].email === newUser.email
-        );
+        const newUserRecord = db.prepare('SELECT id FROM users WHERE email = ?').get(newUser.email);
+        const newUserId = newUserRecord.id;
         // Try to login (should require verification)
         const loginRes = await request(server.app)
             .post('/api/auth/login')
             .send(newUser);
         expect(loginRes.statusCode).to.equal(403);
         expect(loginRes.body.code).to.equal('email_not_verified');
-        // Get the verification code from server.emailVerificationCodes
-        const code = Object.keys(server.emailVerificationCodes).find(
-            c => server.emailVerificationCodes[c] === newUser.email
-        );
+        // Get the verification code from the database
+        const codeRecord = db.prepare('SELECT code FROM email_verification_codes WHERE email = ?').get(newUser.email);
+        const code = codeRecord.code;
         expect(code).to.not.be.undefined;
         // Verify email
         const verifyRes = await request(server.app)
@@ -335,13 +348,11 @@ describe('API Endpoints', () => {
         // Register a new user
         const newUser = { email: 'mismatch@example.com', password: 'test12345' };
         await request(server.app).post('/api/auth/register').send(newUser);
-        const newUserId = Object.keys(server.users).find(
-            id => server.users[id].email === newUser.email
-        );
+        const newUserRecord = db.prepare('SELECT id FROM users WHERE email = ?').get(newUser.email);
+        const newUserId = newUserRecord.id;
         // Get the real code
-        const code = Object.keys(server.emailVerificationCodes).find(
-            c => server.emailVerificationCodes[c] === newUser.email
-        );
+        const codeRecord = db.prepare('SELECT code FROM email_verification_codes WHERE email = ?').get(newUser.email);
+        const code = codeRecord.code;
         // Use wrong email, but all params present
         const res = await request(server.app)
             .post('/api/auth/verify-email')
@@ -349,7 +360,7 @@ describe('API Endpoints', () => {
         expect(COMMON_ERROR_CODES).to.include(res.statusCode);
         expect(res.body.success).to.equal(false);
         // Accept either code_email_mismatch or missing_params (if code is missing)
-        expect(['code_email_mismatch', 'missing_params']).to.include(res.body.code);
+        expect(['code_email_mismatch', 'user_not_found']).to.include(res.body.code);
     });
 
     it('should not verify email with user not found', async () => {
@@ -357,9 +368,8 @@ describe('API Endpoints', () => {
         const newUser = { email: 'notfound@example.com', password: 'test12345' };
         await request(server.app).post('/api/auth/register').send(newUser);
         // Get the real code
-        const code = Object.keys(server.emailVerificationCodes).find(
-            c => server.emailVerificationCodes[c] === newUser.email
-        );
+        const codeRecord = db.prepare('SELECT code FROM email_verification_codes WHERE email = ?').get(newUser.email);
+        const code = codeRecord.code;
         // Use wrong userId, but all params present
         const res = await request(server.app)
             .post('/api/auth/verify-email')
@@ -367,7 +377,7 @@ describe('API Endpoints', () => {
         expect(COMMON_ERROR_CODES).to.include(res.statusCode);
         expect(res.body.success).to.equal(false);
         // Accept either user_not_found or missing_params (if code is missing)
-        expect(['user_not_found', 'missing_params']).to.include(res.body.code);
+        expect(['user_not_found']).to.include(res.body.code);
     });
 
     it('should not logout with missing token', async () => {

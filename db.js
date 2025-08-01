@@ -82,13 +82,23 @@ db.prepare(`CREATE TABLE IF NOT EXISTS email_verification_codes (
     email TEXT NOT NULL
 )`).run();
 
-const bcrypt = require('bcrypt');
-const adminPassword = bcrypt.hashSync('adminpassword', 10); // same password you use to log in
+db.prepare(`CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)`).run();
 
-db.prepare(`
-    INSERT OR IGNORE INTO users (id, email, password_hash, is_email_verified, is_admin)
-    VALUES ('admin-id', 'admin@example.com', ?, 1, 1)
-`).run(adminPassword);
+// Create admin user if it doesn't exist
+const databaseHasAdmin = db.prepare(`SELECT COUNT(*) FROM users WHERE is_admin = 1`).get().count > 0;
+if (!databaseHasAdmin) {
+    const bcrypt = require('bcrypt');
+    const adminPassword = bcrypt.hashSync('adminpassword', 10);
+    db.prepare(`
+        INSERT OR IGNORE INTO users (id, email, password_hash, is_email_verified, is_admin)
+        VALUES ('admin-id', 'admin@example.com', ?, 1, 1)
+    `).run(adminPassword);
+}
 
 module.exports = db;
 
@@ -97,5 +107,5 @@ process.on('exit', () => {
 });
 process.on('SIGINT', () => {
     db.close();
-    process.exit(0); //added this so that the connection would close properly with ctrl+c, feel free to remove.
+    process.exit(0);
 });
