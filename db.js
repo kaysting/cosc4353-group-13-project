@@ -82,6 +82,14 @@ db.prepare(`CREATE TABLE IF NOT EXISTS email_verification_codes (
     email TEXT NOT NULL
 )`).run();
 
+const bcrypt = require('bcrypt');
+const adminPassword = bcrypt.hashSync('adminpassword', 10); // same password you use to log in
+
+db.prepare(`
+    INSERT OR IGNORE INTO users (id, email, password_hash, is_email_verified, is_admin)
+    VALUES ('admin-id', 'admin@example.com', ?, 1, 1)
+`).run(adminPassword);
+
 module.exports = db;
 
 process.on('exit', () => {

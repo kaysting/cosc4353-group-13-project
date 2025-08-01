@@ -457,96 +457,115 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
 });
 
 // Get all events (admin only)
-app.get('/api/events', requireLogin, (req, res) => {
-    if (!req.user.is_admin) {
-        return res.sendApiError(403, 'unauthorized', 'Admin access required');
-    }
+app.get('/api/events', requireLogin, requireAdmin, (req, res) => {
+    const events = db.prepare(`
+        SELECT * FROM events
+    `).all();
 
-    const allEvents = Object.values(events);
+    events.forEach(event => {
+        const skills = db.prepare(`
+            SELECT skill FROM event_skills WHERE event_id = ?
+        `).all(event.id).map(row => row.skill);
+        event.skills = skills;
+    });
 
     // Log the request
-    console.log(`Admin ${req.userId} fetched all events (${allEvents.length} total)`);
-
-    res.sendApiOkay({ events: allEvents });
+    console.log(`Admin ${req.userId} fetched all events (${events.length} total)`);
+    res.sendApiOkay({ events });
 });
 
 // Get a single event
-app.get('/api/events/event', requireLogin, (req, res) => {
+app.get('/api/events/event', requireLogin, requireAdmin, (req, res) => {
     const eventId = req.query.eventId;
-    const event = events[eventId];
+    const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
 
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
 
+    const skills = db.prepare(`
+        SELECT skill FROM event_skills WHERE event_id = ?
+    `).all(eventId).map(row => row.skill);
+
+    event.skills = skills;
+    console.log(`Admin ${req.userId} fetched event ${eventId}`);
     res.sendApiOkay({ event });
 });
 
 // Create new event (admin only)
 app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
     const { name, description, location, skills, urgency, date } = req.body;
+
     if (!name || !description || !location || !Array.isArray(skills) || !urgency || !date) {
         return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
 
-    const eventId = randomString(8, 'hex'); // shorter, readable ID
+    const result = db.prepare(`
+        INSERT INTO events (name, description, location, urgency, date, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `).run(name, description, location, urgency, date, req.userId);
 
-    // Add eventId into the object before normalization
-    const rawEvent = {
-        id: eventId,
-        name,
-        description,
-        location,
-        skills,
-        urgency,
-        date,
-        createdBy: req.userId
-    };
+    const eventId = result.lastInsertRowid;
 
-    events[eventId] = normalizeEvent(rawEvent); // This now includes ID correctly
+    const insertSkill = db.prepare(`
+        INSERT INTO event_skills (event_id, skill) VALUES (?, ?)
+    `);
+    for (const skill of skills) {
+        insertSkill.run(eventId, skill);
+    }
+
+    const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
+    event.skills = skills;
 
     console.log(`Created event ${eventId}: ${name}`);
-    res.sendApiOkay({ event: events[eventId] });
+    res.sendApiOkay({ event });
 });
 
 // Update existing event info (admin only)
 app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
-    const eventId = (req.body.id || '').trim(); // Normalize
-    const { name, description, location, skills, urgency, date } = req.body;
+    const { id, name, description, location, skills, urgency, date } = req.body;
 
-    console.log('Incoming update request with eventId:', eventId); //////////
-    console.log('Available event keys:', Object.keys(events)); ////////////
-
-
-    const event = events[eventId];
+    const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(id);
     if (!event) {
-        console.log('Event not found with ID:', eventId); ////////////
+        console.log('Event not found with ID:', id);
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
 
-    Object.assign(event, normalizeEvent({
-        id: eventId,
-        name,
-        description,
-        location,
-        skills,
-        urgency,
-        date,
-        createdBy: event.createdBy
-    }));
+    // Update the event
+    db.prepare(`
+        UPDATE events
+        SET name = ?, description = ?, location = ?, urgency = ?, date = ?
+        WHERE id = ?
+    `).run(name, description, location, urgency, date, id);
 
-    console.log(`Updated event ${eventId}: ${name}`);
+    // Replace skills
+    db.prepare(`DELETE FROM event_skills WHERE event_id = ?`).run(id);
+    const insertSkill = db.prepare(`
+        INSERT INTO event_skills (event_id, skill) VALUES (?, ?)
+    `);
+    for (const skill of skills) {
+        insertSkill.run(id, skill);
+    }
+
+    const updatedEvent = db.prepare(`SELECT * FROM events WHERE id = ?`).get(id);
+    updatedEvent.skills = skills;
+
+    console.log(`Updated event ${id}: ${name}`);
 
     // Notify assigned volunteers about the update
-    if (eventAssignments[eventId]) {
-        eventAssignments[eventId].forEach(volunteerId => {
-            sendNotification(volunteerId,
-                'Event Updated',
-                `The event "${event.name}" you're assigned to has been updated. Please check the event details.`
-            );
-        });
-    }
-    res.sendApiOkay({ event });
+    const assignedVolunteers = db.prepare(`
+        SELECT user_id FROM event_assignments WHERE event_id = ?
+    `).all(id);
+
+    assignedVolunteers.forEach(({ user_id }) => {
+        sendNotification(
+            user_id,
+            'Event Updated',
+            `The event "${updatedEvent.name}" you're assigned to has been updated. Please check the event details.`
+        );
+    });
+
+    res.sendApiOkay({ event: updatedEvent });
 });
 
 // Get volunteers that are available for a certain event (admin only)
