@@ -481,72 +481,105 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
         return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
 
-    const result = db.prepare(`
-        INSERT INTO events (id, name, description, location, urgency, date, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(randomString(8, 'hex'), name, description, location, urgency, date, req.userId);
+    const eventId = randomString(8, 'hex'); // Consistent event ID
 
-    const eventId = result.lastInsertRowid;
+    const createEventTransaction = db.transaction(() => {
+        // Insert into events
+        db.prepare(`
+            INSERT INTO events (id, name, description, location, urgency, date, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(eventId, name, description, location, urgency, date, req.userId);
 
-    const insertSkill = db.prepare(`
-        INSERT INTO event_skills (event_id, skill) VALUES (?, ?)
-    `);
-    for (const skill of skills) {
-        insertSkill.run(eventId, skill);
+        console.log(`Inserted event: ${eventId} - ${name}`);
+
+        // Insert skills
+        const insertSkill = db.prepare(`
+            INSERT INTO event_skills (event_id, skill) VALUES (?, ?)
+        `);
+
+        for (const skill of skills) {
+            if (skill && typeof skill === 'string') {
+                insertSkill.run(eventId, skill);
+                console.log(`Inserted skill for event ${eventId}: ${skill}`);
+            }
+        }
+    });
+
+    try {
+        createEventTransaction();
+
+        const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
+        event.skills = skills;
+
+        console.log(`Created event ${eventId}: ${name}`);
+        res.sendApiOkay({ event });
+    } catch (err) {
+        console.error('Error creating event:', err);
+        res.sendApiError(500, 'database_error', 'Failed to create event');
     }
-
-    const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
-    event.skills = skills;
-
-    console.log(`Created event ${eventId}: ${name}`);
-    res.sendApiOkay({ event });
 });
 
 // Update existing event info (admin only)
 app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
     const { id, name, description, location, skills, urgency, date } = req.body;
 
-    const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(id);
-    if (!event) {
-        console.log('Event not found with ID:', id);
-        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    if (!id || !name || !description || !location || !Array.isArray(skills) || !urgency || !date) {
+        return res.sendApiError(400, 'invalid_input', 'All fields are required and must be valid.');
     }
 
-    // Update the event
-    db.prepare(`
-        UPDATE events
-        SET name = ?, description = ?, location = ?, urgency = ?, date = ?
-        WHERE id = ?
-    `).run(name, description, location, urgency, date, id);
+    const updateEventTransaction = db.transaction(() => {
+        // Update event
+        const result = db.prepare(`
+            UPDATE events
+            SET name = ?, description = ?, location = ?, urgency = ?, date = ?
+            WHERE id = ?
+        `).run(name, description, location, urgency, date, id);
 
-    // Replace skills
-    db.prepare(`DELETE FROM event_skills WHERE event_id = ?`).run(id);
-    const insertSkill = db.prepare(`
-        INSERT INTO event_skills (event_id, skill) VALUES (?, ?)
-    `);
-    for (const skill of skills) {
-        insertSkill.run(id, skill);
-    }
+        if (result.changes === 0) {
+            throw new Error('Event not found');
+        }
 
-    const updatedEvent = db.prepare(`SELECT * FROM events WHERE id = ?`).get(id);
-    updatedEvent.skills = skills;
+        console.log(`Updated event ${id}: ${name}`);
 
-    console.log(`Updated event ${id}: ${name}`);
-
-    // Notify assigned volunteers about the update
-    const assignedVolunteers = db.prepare(`
-        SELECT user_id FROM event_assignments WHERE event_id = ?
-    `).all(id);
-
-    assignedVolunteers.forEach(({ user_id }) => {
-        sendNotification(
-            user_id,
-            'Event Updated',
-            `The event "${updatedEvent.name}" you're assigned to has been updated. Please check the event details.`
-        );
+        // Replace skills
+        db.prepare(`DELETE FROM event_skills WHERE event_id = ?`).run(id);
+        const insertSkill = db.prepare(`INSERT INTO event_skills (event_id, skill) VALUES (?, ?)`);
+        for (const skill of skills) {
+            if (skill && typeof skill === 'string') {
+                insertSkill.run(id, skill);
+                console.log(`Inserted skill for event ${id}: ${skill}`);
+            }
+        }
     });
 
-    res.sendApiOkay({ event: updatedEvent });
+    try {
+        updateEventTransaction();
+
+        // Fetch updated event + skills
+        const updatedEvent = db.prepare(`SELECT * FROM events WHERE id = ?`).get(id);
+        updatedEvent.skills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`).all(id).map(r => r.skill);
+
+        // Notify assigned volunteers
+        const assignedVolunteers = db.prepare(`
+            SELECT user_id FROM event_assignments WHERE event_id = ?
+        `).all(id);
+
+        assignedVolunteers.forEach(({ user_id }) => {
+            sendNotification(
+                user_id,
+                'Event Updated',
+                `The event "${updatedEvent.name}" you're assigned to has been updated. Please check the event details.`
+            );
+        });
+
+        res.sendApiOkay({ event: updatedEvent });
+    } catch (err) {
+        console.error('Error updating event:', err);
+        if (err.message === 'Event not found') {
+            return res.sendApiError(404, 'event_not_found', 'Event not found');
+        }
+        res.sendApiError(500, 'database_error', 'Failed to update event');
+    }
 });
 
 // Get volunteers that are available for a certain event (admin only)
