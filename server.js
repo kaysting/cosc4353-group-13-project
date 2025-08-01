@@ -408,7 +408,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         db.prepare(`DELETE FROM user_skills WHERE user_id = ?`).run(req.userId);
 
         const insertSkill = db.prepare(`INSERT INTO user_skills (user_id, skill) VALUES (?, ?)`);
-        if (Array, isArray(skills)) {
+        if (Array. isArray(skills)) {
             for (const skill of skills) {
                 insertSkill.run(req.userId, skill);
             }
@@ -628,66 +628,148 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
 // Assign a volunteer to an event (admin only)
 app.post('/api/events/match/assign', requireLogin, requireAdmin, (req, res) => {
     const { eventId, volunteerId } = req.body;
-
+    
     if (!volunteerId) {
         return res.sendApiError(400, 'missing_volunteer', 'Volunteer ID is required');
     }
-
-    const event = events[eventId];
-    if (!event) {
-        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    
+    try {
+        // Check event exists
+        const event = db.prepare(`
+            SELECT name, date FROM events WHERE id = ?
+        `).get(eventId);
+        
+        if (!event) {
+            return res.sendApiError(404, 'event_not_found', 'Event not found');
+        }
+        
+        // Check volunteer exists
+        const volunteer = db.prepare(`
+            SELECT id FROM users WHERE id = ?
+        `).get(volunteerId);
+        
+        if (!volunteer) {
+            return res.sendApiError(404, 'volunteer_not_found', 'Volunteer not found');
+        }
+        
+        // Check if already assigned
+        const existing = db.prepare(`
+            SELECT 1 FROM event_assignments WHERE event_id = ? AND user_id = ?
+        `).get(eventId, volunteerId);
+        
+        if (existing) {
+            return res.sendApiError(400, 'already_assigned', 'Volunteer is already assigned to this event');
+        }
+        
+        // Start transaction
+        db.prepare('BEGIN').run();
+        
+        // Create assignment
+        db.prepare(`
+            INSERT INTO event_assignments (event_id, user_id)
+            VALUES (?, ?)
+        `).run(eventId, volunteerId);
+        
+        // Add to volunteer history
+        db.prepare(`
+            INSERT INTO volunteer_history (user_id, event_id, status, assigned_at)
+            VALUES (?, ?, ?, ?)
+        `).run(volunteerId, eventId, 'Assigned', new Date().toISOString());
+        
+        // Send notification
+        const notificationId = crypto.randomUUID();
+        db.prepare(`
+            INSERT INTO notifications (id, user_id, header, description, time, is_unread)
+            VALUES (?, ?, ?, ?, ?, 1)
+        `).run(
+            notificationId,
+            volunteerId,
+            'Event Assignment',
+            `You have been assigned to "${event.name}" on ${event.date}`,
+            Date.now()
+        );
+        
+        db.prepare('COMMIT').run();
+        
+        res.sendApiOkay({ message: 'Volunteer assigned successfully' });
+    } catch (err) {
+        db.prepare('ROLLBACK').run();
+        console.error('Assign volunteer error:', err);
+        res.sendApiError(500, 'db_error', 'Failed to assign volunteer');
     }
-
-    const volunteer = users[volunteerId];
-    if (!volunteer) {
-        return res.sendApiError(404, 'volunteer_not_found', 'Volunteer not found');
-    }
-
-    if (!eventAssignments[eventId]) {
-        eventAssignments[eventId] = [];
-    }
-
-    if (eventAssignments[eventId].includes(volunteerId)) {
-        return res.sendApiError(400, 'already_assigned', 'Volunteer is already assigned to this event');
-    }
-
-    eventAssignments[eventId].push(volunteerId);
-
-    // Send notification to volunteer about assignment
-    sendNotification(volunteerId,
-        'Event Assignment',
-        `You have been assigned to "${event.name}" on ${event.date}`
-    );
-
-    // Add to volunteer history (store only eventId, status, assignedAt)
-    if (!volunteerHistory[volunteerId]) volunteerHistory[volunteerId] = [];
-    volunteerHistory[volunteerId].push(normalizeHistoryEntry({
-        eventId: eventId,
-        status: 'Assigned',
-        assignedAt: new Date().toISOString()
-    }));
-    res.sendApiOkay({ message: 'Volunteer assigned successfully' });
 });
 
 // Get notifications for the current user
+// Get notifications for the current user
 app.get('/api/notifications', requireLogin, (req, res) => {
-    const userNotifications = (notifications[req.userId] || []).map(normalizeNotification);
-    res.sendApiOkay({ notifications: userNotifications });
+    try {
+        const notifications = db.prepare(`
+            SELECT id, header, description, time, is_unread
+            FROM notifications
+            WHERE user_id = ?
+            ORDER BY time DESC
+        `).all(req.userId);
+        
+        res.sendApiOkay({ 
+            notifications: notifications.map(n => ({
+                id: n.id,
+                header: n.header,
+                description: n.description,
+                time: n.time,
+                read: !n.is_unread
+            }))
+        });
+    } catch (err) {
+        console.error('Get notifications error:', err);
+        res.sendApiError(500, 'db_error', 'Failed to fetch notifications');
+    }
 });
 
 // Get volunteer history (maybe admin only?)
+// Get volunteer history
 app.get('/api/history', requireLogin, (req, res) => {
-    // Return event info by reference, not duplication
-    const history = (volunteerHistory[req.userId] || []).map(entry => {
-        const event = events[entry.eventId] || {};
-        return {
-            eventId: entry.eventId,
-            event: event.id ? normalizeEvent(event) : null,
+    try {
+        const history = db.prepare(`
+            SELECT 
+                vh.event_id,
+                vh.status,
+                vh.assigned_at,
+                e.name as event_name,
+                e.description,
+                e.location,
+                e.urgency,
+                e.date
+            FROM volunteer_history vh
+            LEFT JOIN events e ON vh.event_id = e.id
+            WHERE vh.user_id = ?
+            ORDER BY vh.assigned_at DESC
+        `).all(req.userId);
+        
+        // Get skills for each event
+        const getSkills = db.prepare(`
+            SELECT skill FROM event_skills WHERE event_id = ?
+        `);
+        
+        const historyWithDetails = history.map(entry => ({
+            eventId: entry.event_id,
+            event: entry.event_name ? {
+                id: entry.event_id,
+                name: entry.event_name,
+                description: entry.description,
+                location: entry.location,
+                urgency: entry.urgency,
+                date: entry.date,
+                skills: getSkills.all(entry.event_id).map(row => row.skill)
+            } : null,
             status: entry.status,
-            assignedAt: entry.assignedAt
-        };
-    });
-    res.sendApiOkay({ history });
+            assignedAt: entry.assigned_at
+        }));
+        
+        res.sendApiOkay({ history: historyWithDetails });
+    } catch (err) {
+        console.error('Get history error:', err);
+        res.sendApiError(500, 'db_error', 'Failed to fetch history');
+    }
 });
 
 // Endpoint to verify email with code, userId, and email (no login required)
