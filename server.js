@@ -332,12 +332,12 @@ app.get('/api/profile', requireLogin, (req, res) => {
             city: row?.city || '',
             state: row?.state || '',
             zipCode: row?.zip_code || '',
+            skills,
             preferences: row?.preferences || '',
             availabilityStart: row?.availability_start || '',
-            availabilityEnd: row?.availability_end || '',
-            skills
+            availabilityEnd: row?.availability_end || ''
         };
-        res.sendApiOkay({ profile });
+        res.sendApiOkay(profile);
     } catch (err) {
         console.error(err);
         res.sendApiError(500, 'db_error', 'Failed to load user profile');
