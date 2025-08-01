@@ -439,37 +439,34 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
 
 // Get all events (admin only)
 app.get('/api/events', requireLogin, requireAdmin, (req, res) => {
-    const events = db.prepare(`
-        SELECT * FROM events
-    `).all();
+    const events = db.prepare(`SELECT * FROM events`).all();
 
-    events.forEach(event => {
-        const skills = db.prepare(`
-            SELECT skill FROM event_skills WHERE event_id = ?
-        `).all(event.id).map(row => row.skill);
+    // Attach skills to each event
+    const getSkills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
+    for (const event of events) {
+        const skills = getSkills.all(event.id).map(s => s.skill);
         event.skills = skills;
-    });
+    }
 
-    // Log the request
-    console.log(`Admin ${req.userId} fetched all events (${events.length} total)`);
+    console.log(`Admin ${req.userId} fetched all events (${events.length} total)`); ///////
     res.sendApiOkay({ events });
 });
 
-// Get a single event
+// Get a single event (admin only)
 app.get('/api/events/event', requireLogin, requireAdmin, (req, res) => {
     const eventId = req.query.eventId;
     const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
 
     if (!event) {
+        console.log('Event not found with ID:', eventId); ///////
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
 
-    const skills = db.prepare(`
-        SELECT skill FROM event_skills WHERE event_id = ?
-    `).all(eventId).map(row => row.skill);
-
+    // Fetch skills for this event
+    const skills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`).all(eventId).map(s => s.skill);
     event.skills = skills;
-    console.log(`Admin ${req.userId} fetched event ${eventId}`);
+
+    console.log(`Admin ${req.userId} fetched event ${eventId} with skills:`, skills); ///////
     res.sendApiOkay({ event });
 });
 
