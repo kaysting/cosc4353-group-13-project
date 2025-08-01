@@ -420,6 +420,8 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
     }
 });
 
+/*
+
 // Get events assigned to the current user
 app.post('/api/profile/events', requireLogin, (req, res) => {
     const userId = req.userId;
@@ -435,6 +437,31 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
     console.log(`User ${userId} fetched ${assigned.length} assigned event(s)`);
 
     res.sendApiOkay({ events: assigned });
+});
+
+*/
+
+// Get events assigned to the current user (with skills)
+app.post('/api/profile/events', requireLogin, (req, res) => {
+    const userId = req.userId;
+
+    // Get events for the logged-in volunteer
+    const assignedEvents = db.prepare(`
+        SELECT e.* 
+        FROM events e
+        JOIN event_assignments ea ON e.id = ea.event_id
+        WHERE ea.user_id = ?
+    `).all(userId);
+
+    // Fetch skills for each event
+    const skillStmt = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
+    assignedEvents.forEach(event => {
+        const skills = skillStmt.all(event.id).map(row => row.skill);
+        event.skills = skills;
+    });
+
+    console.log(`User ${userId} fetched ${assignedEvents.length} assigned event(s).`);
+    res.sendApiOkay({ events: assignedEvents });
 });
 
 // Get all events (admin only)
@@ -508,7 +535,7 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
         const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
         event.skills = skills;
 
-        console.log(`Created event ${eventId}: ${name}`);
+        console.log(`Created event ${eventId}: ${name} with skills: [${skills.join(', ')}]`);
         res.sendApiOkay({ event });
     } catch (err) {
         console.error('Error creating event:', err);
@@ -536,7 +563,7 @@ app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
             throw new Error('Event not found');
         }
 
-        console.log(`Updated event ${id}: ${name}`);
+        console.log(`Updated event ${id}: ${name} with skills: [${skills.join(', ')}]`);
 
         // Replace skills
         db.prepare(`DELETE FROM event_skills WHERE event_id = ?`).run(id);
