@@ -647,12 +647,33 @@ const routes = [
                     item.className = 'list-group-item d-flex justify-content-between align-items-center';
                     item.textContent = `${event.name} (${event.date})`;
 
+                    // Edit link
                     const editLink = document.createElement('a');
                     editLink.href = `/admin/events/${event.id}`;
                     editLink.textContent = 'Edit';
                     editLink.className = 'btn btn-sm btn-primary';
 
-                    item.appendChild(editLink);
+                    // Delete button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'btn btn-sm btn-danger ms-2';
+                    deleteBtn.addEventListener('click', async () => {
+                        if (confirm(`Are you sure you want to delete "${event.name}"?`)) {
+                            const response = await api.events.delete(event.id);
+                            if (response.success) {
+                                alert('Event deleted successfully!');
+                                navigate('/admin/events'); // Refresh list
+                            } else {
+                                alert('Error deleting event: ' + response.message);
+                            }
+                        }
+                    });
+
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.appendChild(editLink);
+                    buttonGroup.appendChild(deleteBtn);
+
+                    item.appendChild(buttonGroup);
                     list.appendChild(item);
                 });
 
