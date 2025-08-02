@@ -110,20 +110,12 @@ const notifications = {};
 const volunteerHistory = {};
 const eventAssignments = {};
 
-const sendNotification = (recipientId, header, description, time = Date.now()) => {
-    if (!notifications[recipientId]) {
-        notifications[recipientId] = [];
-    }
-
-    const notification = {
-        id: crypto.randomUUID(),
-        header,
-        description,
-        time,
-        read: false
-    };
-
-    notifications[recipientId].push(notification);
+const sendNotification = (recipientId, header, description) => {
+    const notificationId = crypto.randomUUID();
+    db.prepare(`
+        INSERT INTO notifications (id, user_id, header, description, time, is_unread)
+        VALUES (?, ?, ?, ?, ?, 1)
+    `).run(notificationId, recipientId, header, description, Date.now());
 
     // Send email notification if user exists and email is verified
     const user = db.prepare('SELECT email, is_email_verified FROM users WHERE id = ?').get(recipientId);
@@ -241,20 +233,21 @@ app.post('/api/auth/register', async (req, res) => {
 
     db.prepare('INSERT INTO users (id, email, password_hash, is_email_verified, is_admin) VALUES (@id, @email, @password_hash, @is_email_verified, @is_admin)').run(user);
 
-    // Send verification email
+    res.sendApiOkay({ user });
+
+    // Send verification email (do not block response)
     if (config.mailgun_api_key) {
         sendVerificationEmail(email).catch(err => {
             console.error(`Failed to send verification email to ${email}:`, err);
         });
     }
 
-    // Send welcome notification
+    // Send welcome notification (do not block response)
     sendNotification(userId,
         'Welcome to Volunteer Platform!',
         'Thanks for registering! Please log in, verify your email address, and complete your profile to get started. Looking forward to your contributions!'
     );
     console.log(`Created user ${userId} (${email})`);
-    res.sendApiOkay({ user });
 });
 
 // Log into account with username/email and password, returns a session token
@@ -358,6 +351,10 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         availabilityStart,
         availabilityEnd
     } = req.body;
+    // Validate required fields
+    if (!fullName || !address1 || !city || !state || !zipCode) {
+        return res.sendApiError(400, 'missing_required', 'Missing required profile fields.');
+    }
     //Make sure zip code is of 5 char length 
     if (zipCode && !isZipValid(zipCode)) {
         return res.sendApiError(400, 'invalid_zip', 'Zip code must be 5 digits');
@@ -408,7 +405,7 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         db.prepare(`DELETE FROM user_skills WHERE user_id = ?`).run(req.userId);
 
         const insertSkill = db.prepare(`INSERT INTO user_skills (user_id, skill) VALUES (?, ?)`);
-        if (Array. isArray(skills)) {
+        if (Array.isArray(skills)) {
             for (const skill of skills) {
                 insertSkill.run(req.userId, skill);
             }
@@ -652,69 +649,63 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
 // Assign a volunteer to an event (admin only)
 app.post('/api/events/match/assign', requireLogin, requireAdmin, (req, res) => {
     const { eventId, volunteerId } = req.body;
-    
+
     if (!volunteerId) {
         return res.sendApiError(400, 'missing_volunteer', 'Volunteer ID is required');
     }
-    
+
     try {
         // Check event exists
         const event = db.prepare(`
             SELECT name, date FROM events WHERE id = ?
         `).get(eventId);
-        
+
         if (!event) {
             return res.sendApiError(404, 'event_not_found', 'Event not found');
         }
-        
+
         // Check volunteer exists
         const volunteer = db.prepare(`
             SELECT id FROM users WHERE id = ?
         `).get(volunteerId);
-        
+
         if (!volunteer) {
             return res.sendApiError(404, 'volunteer_not_found', 'Volunteer not found');
         }
-        
+
         // Check if already assigned
         const existing = db.prepare(`
             SELECT 1 FROM event_assignments WHERE event_id = ? AND user_id = ?
         `).get(eventId, volunteerId);
-        
+
         if (existing) {
             return res.sendApiError(400, 'already_assigned', 'Volunteer is already assigned to this event');
         }
-        
+
         // Start transaction
         db.prepare('BEGIN').run();
-        
+
         // Create assignment
         db.prepare(`
             INSERT INTO event_assignments (event_id, user_id)
             VALUES (?, ?)
         `).run(eventId, volunteerId);
-        
+
         // Add to volunteer history
         db.prepare(`
             INSERT INTO volunteer_history (user_id, event_id, status, assigned_at)
             VALUES (?, ?, ?, ?)
         `).run(volunteerId, eventId, 'Assigned', new Date().toISOString());
-        
+
         // Send notification
-        const notificationId = crypto.randomUUID();
-        db.prepare(`
-            INSERT INTO notifications (id, user_id, header, description, time, is_unread)
-            VALUES (?, ?, ?, ?, ?, 1)
-        `).run(
-            notificationId,
+        sendNotification(
             volunteerId,
             'Event Assignment',
-            `You have been assigned to "${event.name}" on ${event.date}`,
-            Date.now()
+            `You have been assigned to "${event.name}" on ${event.date}`
         );
-        
+
         db.prepare('COMMIT').run();
-        
+
         res.sendApiOkay({ message: 'Volunteer assigned successfully' });
     } catch (err) {
         db.prepare('ROLLBACK').run();
@@ -733,8 +724,8 @@ app.get('/api/notifications', requireLogin, (req, res) => {
             WHERE user_id = ?
             ORDER BY time DESC
         `).all(req.userId);
-        
-        res.sendApiOkay({ 
+
+        res.sendApiOkay({
             notifications: notifications.map(n => ({
                 id: n.id,
                 header: n.header,
@@ -768,12 +759,12 @@ app.get('/api/history', requireLogin, (req, res) => {
             WHERE vh.user_id = ?
             ORDER BY vh.assigned_at DESC
         `).all(req.userId);
-        
+
         // Get skills for each event
         const getSkills = db.prepare(`
             SELECT skill FROM event_skills WHERE event_id = ?
         `);
-        
+
         const historyWithDetails = history.map(entry => ({
             eventId: entry.event_id,
             event: entry.event_name ? {
@@ -788,7 +779,7 @@ app.get('/api/history', requireLogin, (req, res) => {
             status: entry.status,
             assignedAt: entry.assigned_at
         }));
-        
+
         res.sendApiOkay({ history: historyWithDetails });
     } catch (err) {
         console.error('Get history error:', err);
@@ -802,14 +793,24 @@ app.post('/api/auth/verify-email', (req, res) => {
     if (!userId || !email || !code) {
         return res.sendApiError(400, 'missing_params', 'User ID, email, and code are required');
     }
-    const verificationEntry = db.prepare('SELECT email FROM email_verification_codes WHERE code = ?').get(code);
+    let verificationEntry;
+    try {
+        verificationEntry = db.prepare('SELECT email FROM email_verification_codes WHERE code = ?').get(code);
+    } catch (err) {
+        return res.sendApiError(400, 'invalid_code', 'Verification code is invalid or expired');
+    }
     if (!verificationEntry) {
         return res.sendApiError(400, 'invalid_code', 'Verification code is invalid or expired');
     }
     if (verificationEntry.email.toLowerCase() !== email.toLowerCase()) {
         return res.sendApiError(400, 'code_email_mismatch', 'Verification code does not match email');
     }
-    const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(userId);
+    let user;
+    try {
+        user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(userId);
+    } catch (err) {
+        return res.sendApiError(404, 'user_not_found', 'User not found for this code and email');
+    }
     if (!user || user.email.toLowerCase() !== email.toLowerCase()) {
         return res.sendApiError(404, 'user_not_found', 'User not found for this code and email');
     }
@@ -818,9 +819,21 @@ app.post('/api/auth/verify-email', (req, res) => {
     res.sendApiOkay({ message: 'Email verified successfully!' });
 });
 
+
 // Catch-all route to serve the index.html file for any unmatched routes
-app.use((req, res) => {
+app.use((req, res, next) => {
+    if (req.originalUrl.startsWith('/api/')) {
+        // API route not found
+        return res.status(404).json({ success: false, code: 'not_found', message: 'API endpoint not found' });
+    }
     res.sendFile(__dirname + '/public/index.html');
+});
+
+// Error handler middleware (must be last)
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ success: false, code: 'internal_error', message: 'An unexpected error occurred.' });
 });
 
 // Start the server
@@ -829,5 +842,6 @@ const appRunning = app.listen(config.server_port, () => {
 });
 
 module.exports = {
-    app: appRunning
+    app: appRunning,
+    expressApp: app
 };
