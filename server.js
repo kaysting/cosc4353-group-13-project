@@ -104,12 +104,6 @@ function normalizeHistoryEntry(entry) {
     };
 }
 
-// In-memory data maps to act as database for now
-const events = {};
-const notifications = {};
-const volunteerHistory = {};
-const eventAssignments = {};
-
 const sendNotification = (recipientId, header, description) => {
     const notificationId = crypto.randomUUID();
     db.prepare(`
@@ -663,7 +657,7 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
             const isAvailable =
                 (!vol.availability_start || !vol.availability_end) ||
                 (new Date(event.date) >= new Date(vol.availability_start) &&
-                 new Date(event.date) <= new Date(vol.availability_end));
+                    new Date(event.date) <= new Date(vol.availability_end));
 
             // Check location match (basic: city & state must match)
             const locationMatch = vol.city && vol.state &&
