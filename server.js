@@ -621,42 +621,66 @@ app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
 // Get volunteers that are available for a certain event (admin only)
 app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
     const eventId = req.query.eventId;
-    const event = events[eventId];
+
+    // Get event details
+    const event = db.prepare(`
+        SELECT id, name, description, location, urgency, date
+        FROM events
+        WHERE id = ? AND deleted = 0
+    `).get(eventId);
 
     if (!event) {
         return res.sendApiError(404, 'event_not_found', 'Event not found');
     }
 
-    const matchingVolunteers = [];
+    // Get required skills for the event
+    const requiredSkills = db.prepare(`
+        SELECT skill FROM event_skills WHERE event_id = ?
+    `).all(eventId).map(row => row.skill);
 
-    for (const userId in users) {
-        const user = users[userId];
-        const profile = userProfiles[userId];
+    // Get already assigned volunteers
+    const assignedVolunteers = db.prepare(`
+        SELECT user_id FROM event_assignments WHERE event_id = ?
+    `).all(eventId).map(row => row.user_id);
 
-        if (eventAssignments[eventId] && eventAssignments[eventId].includes(userId)) {
-            continue;
-        }
+    // Get all volunteers excluding assigned ones
+    const volunteers = db.prepare(`
+        SELECT u.id, u.email, up.full_name, up.city, up.state, up.availability_start, up.availability_end
+        FROM users u
+        JOIN user_profiles up ON u.id = up.user_id
+        WHERE u.is_admin = 0
+    `).all();
 
-        const hasRequiredSkills = event.skills.some(skill =>
-            (profile.skills || []).includes(skill)
-        );
+    const getUserSkills = db.prepare(`SELECT skill FROM user_skills WHERE user_id = ?`);
 
-        const isAvailable = (profile.availability_dates || []).includes(event.date);
+    const matchingVolunteers = volunteers
+        .filter(vol => !assignedVolunteers.includes(vol.id)) // Exclude assigned
+        .map(vol => {
+            const volSkills = getUserSkills.all(vol.id).map(row => row.skill);
+            const hasRequiredSkills = requiredSkills.every(skill => volSkills.includes(skill));
 
-        const locationMatch = profile.city && profile.state &&
-            event.location.includes(profile.city) &&
-            event.location.includes(profile.state);
+            // Check availability
+            const isAvailable =
+                (!vol.availability_start || !vol.availability_end) ||
+                (new Date(event.date) >= new Date(vol.availability_start) &&
+                 new Date(event.date) <= new Date(vol.availability_end));
 
-        if (hasRequiredSkills && isAvailable && locationMatch) {
-            matchingVolunteers.push({
-                userId: userId,
-                name: profile.fullName || user.email, //this line was previously: 'name: profile.name || user.email,'
-                email: user.email,
-                skills: profile.skills,
-                location: `${profile.city}, ${profile.state}`
-            });
-        }
-    }
+            // Check location match (basic: city & state must match)
+            const locationMatch = vol.city && vol.state &&
+                event.location.includes(vol.city) &&
+                event.location.includes(vol.state);
+
+            return hasRequiredSkills && isAvailable && locationMatch
+                ? {
+                    userId: vol.id,
+                    name: vol.full_name || vol.email,
+                    email: vol.email,
+                    skills: volSkills,
+                    location: `${vol.city || ''}, ${vol.state || ''}`
+                }
+                : null;
+        })
+        .filter(Boolean);
 
     res.sendApiOkay({ volunteers: matchingVolunteers });
 });
