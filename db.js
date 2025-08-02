@@ -34,11 +34,12 @@ db.prepare(`CREATE TABLE IF NOT EXISTS user_skills (
 db.prepare(`CREATE TABLE IF NOT EXISTS events (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    description TEXT,
-    location TEXT,
-    urgency TEXT,
-    date TEXT,
-    created_by TEXT,
+    description TEXT NOT NULL,
+    location TEXT NOT NULL,
+    urgency TEXT NOT NULL,
+    date TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    deleted INTEGER DEFAULT 0,
     FOREIGN KEY(created_by) REFERENCES users(id)
 )`).run();
 

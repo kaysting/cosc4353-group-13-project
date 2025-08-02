@@ -463,7 +463,7 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
 
 // Get all events (admin only)
 app.get('/api/events', requireLogin, requireAdmin, (req, res) => {
-    const events = db.prepare(`SELECT * FROM events`).all();
+    const events = db.prepare(`SELECT * FROM events WHERE deleted = 0`).all();
 
     // Attach skills to each event
     const getSkills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
@@ -479,7 +479,7 @@ app.get('/api/events', requireLogin, requireAdmin, (req, res) => {
 // Get a single event (admin only)
 app.get('/api/events/event', requireLogin, requireAdmin, (req, res) => {
     const eventId = req.query.eventId;
-    const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(eventId);
+    const event = db.prepare(`SELECT * FROM events WHERE id = ? AND deleted = 0`).get(eventId);
 
     if (!event) {
         console.log('Event not found with ID:', eventId); ///////
@@ -492,6 +492,21 @@ app.get('/api/events/event', requireLogin, requireAdmin, (req, res) => {
 
     console.log(`Admin ${req.userId} fetched event ${eventId} with skills:`, skills); ///////
     res.sendApiOkay({ event });
+});
+
+// Soft delete event (admin only)
+app.post('/api/events/delete', requireLogin, requireAdmin, (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.sendApiError(400, 'invalid_input', 'Event ID is required.');
+
+    const result = db.prepare(`UPDATE events SET deleted = 1 WHERE id = ?`).run(id);
+
+    if (result.changes === 0) {
+        return res.sendApiError(404, 'event_not_found', 'Event not found');
+    }
+
+    console.log(`Event ${id} marked as deleted by admin ${req.userId}`);
+    res.sendApiOkay({ message: 'Event deleted successfully' });
 });
 
 // Create new event (admin only)
