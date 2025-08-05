@@ -5,6 +5,9 @@ const bcrypt = require('bcrypt');
 const formData = require('form-data');
 const Mailgun = require('mailgun.js');
 const config = require('./config.json');
+const PDFDocument = require('pdfkit');
+const { createObjectCsvWriter } = require('csv-writer');
+const fs = require('fs');
 
 const db = require('./db.js');
 
@@ -850,6 +853,30 @@ app.post('/api/auth/verify-email', (req, res) => {
     db.prepare('UPDATE users SET is_email_verified = 1 WHERE id = ?').run(userId);
     db.prepare('DELETE FROM email_verification_codes WHERE code = ?').run(code);
     res.sendApiOkay({ message: 'Email verified successfully!' });
+});
+
+// Generate Volunteer Report
+app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) => {
+    const format = req.query.format || 'json';
+    
+    try {
+        // ... (rest of the volunteer report code from the artifact)
+    } catch (err) {
+        console.error('Volunteer report generation error:', err);
+        res.sendApiError(500, 'report_error', 'Failed to generate volunteer report');
+    }
+});
+
+// Generate Event Report
+app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
+    const format = req.query.format || 'json';
+    
+    try {
+        // ... (rest of the event report code from the artifact)
+    } catch (err) {
+        console.error('Event report generation error:', err);
+        res.sendApiError(500, 'report_error', 'Failed to generate event report');
+    }
 });
 
 
