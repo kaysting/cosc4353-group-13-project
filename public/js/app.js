@@ -285,10 +285,56 @@ const routes = [
                                 <label for="state" class="form-label">State</label>
                                 <select id="state" class="form-select" required disabled>
                                     <option value="">Select State</option>
-                                    <option value="TX">Texas</option>
-                                    <option value="FL">Florida</option>
+                                    <option value="AL">Alabama</option>
+                                    <option value="AK">Alaska</option>
                                     <option value="AZ">Arizona</option>
+                                    <option value="AR">Arkansas</option>
                                     <option value="CA">California</option>
+                                    <option value="CO">Colorado</option>
+                                    <option value="CT">Connecticut</option>
+                                    <option value="DE">Delaware</option>
+                                    <option value="FL">Florida</option>
+                                    <option value="GA">Georgia</option>
+                                    <option value="HI">Hawaii</option>
+                                    <option value="ID">Idaho</option>
+                                    <option value="IL">Illinois</option>
+                                    <option value="IN">Indiana</option>
+                                    <option value="IA">Iowa</option>
+                                    <option value="KS">Kansas</option>
+                                    <option value="KY">Kentucky</option>
+                                    <option value="LA">Louisiana</option>
+                                    <option value="ME">Maine</option>
+                                    <option value="MD">Maryland</option>
+                                    <option value="MA">Massachusetts</option>
+                                    <option value="MI">Michigan</option>
+                                    <option value="MN">Minnesota</option>
+                                    <option value="MS">Mississippi</option>
+                                    <option value="MO">Missouri</option>
+                                    <option value="MT">Montana</option>
+                                    <option value="NE">Nebraska</option>
+                                    <option value="NV">Nevada</option>
+                                    <option value="NH">New Hampshire</option>
+                                    <option value="NJ">New Jersey</option>
+                                    <option value="NM">New Mexico</option>
+                                    <option value="NY">New York</option>
+                                    <option value="NC">North Carolina</option>
+                                    <option value="ND">North Dakota</option>
+                                    <option value="OH">Ohio</option>
+                                    <option value="OK">Oklahoma</option>
+                                    <option value="OR">Oregon</option>
+                                    <option value="PA">Pennsylvania</option>
+                                    <option value="RI">Rhode Island</option>
+                                    <option value="SC">South Carolina</option>
+                                    <option value="SD">South Dakota</option>
+                                    <option value="TN">Tennessee</option>
+                                    <option value="TX">Texas</option>
+                                    <option value="UT">Utah</option>
+                                    <option value="VT">Vermont</option>
+                                    <option value="VA">Virginia</option>
+                                    <option value="WA">Washington</option>
+                                    <option value="WV">West Virginia</option>
+                                    <option value="WI">Wisconsin</option>
+                                    <option value="WY">Wyoming</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -300,9 +346,14 @@ const routes = [
                         <div class="mb-3">
                             <label for="skills" class="form-label">Skills</label>
                             <select id="skills" class="form-select" multiple required disabled>
-                                <option value="html">HTML</option>
-                                <option value="css">CSS</option>
-                                <option value="javascript">JSS</option>
+                                <option value="bilingual">Bilingual</option>
+                                <option value="carpentry">Carpentry</option>
+                                <option value="cooking">Cooking</option>
+                                <option value="cleaning">Cleaning</option>
+                                <option value="digital_marketing">Digital Marketing</option>
+                                <option value="first_aid">First Aid</option>
+                                <option value="physical_trainer">Physical Trainer</option>
+                                <option value="transport">Transport</option>
                             </select>
                         </div>
 
@@ -390,7 +441,7 @@ const routes = [
                 event.preventDefault();
                 //check that Zip code is only 5 digits
                 if (!/^\d{5}$/.test(inputZipCode.value)) {
-                    alert("Zip code must be exactly 5 digits.");
+                    alert("Zip Code must be 5 digits.");
                     return;
                 }
                 //Date range check
