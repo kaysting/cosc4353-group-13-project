@@ -146,6 +146,34 @@ Get volunteer history for the current user.
 
 ---
 
+### Reports (Admin Only)
+
+#### GET `/api/reports/volunteers`
+Generate comprehensive volunteer participation report.
+- **Headers:** `Authorization: <admin token>` (required)
+- **Query Parameters:** 
+  - `format`: `json` | `csv` | `pdf` (optional, defaults to `json`)
+- **Responses:**
+  - `200 OK` (JSON): `{ success: true, report_type: 'volunteers', volunteers: [...] }`
+  - `200 OK` (CSV): Downloads CSV file with volunteer data
+  - `200 OK` (PDF): Downloads PDF report with formatted volunteer information
+  - `403` if not admin
+  - `401` if not authenticated
+  - `500` if report generation fails
+
+**Example Request:**
+```bash
+# Get JSON data
+curl -H "Authorization: <token>" http://localhost:3000/api/reports/volunteers?format=json
+
+# Download PDF
+curl -H "Authorization: <token>" http://localhost:3000/api/reports/volunteers?format=pdf -o volunteer_report.pdf
+
+# Download CSV
+curl -H "Authorization: <token>" http://localhost:3000/api/reports/volunteers?format=csv -o volunteer_report.csv
+
+---
+
 ### Error Handling
 All error responses have the form:
 ```
