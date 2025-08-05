@@ -172,6 +172,7 @@ curl -H "Authorization: <token>" http://localhost:3000/api/reports/volunteers?fo
 # Download CSV
 curl -H "Authorization: <token>" http://localhost:3000/api/reports/volunteers?format=csv -o volunteer_report.csv
 
+```
 ---
 
 ### Error Handling
