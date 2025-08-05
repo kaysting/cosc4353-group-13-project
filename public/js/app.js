@@ -912,6 +912,180 @@ const routes = [
 
             render(page);
         }
+    },
+    
+{
+        path: '/admin/reports',
+        handler: async () => {
+            // Check admin access
+            const currentUser = await api.auth.getCurrentUser();
+            if (!currentUser || !currentUser.is_admin) {
+                const page = document.createElement('div');
+                page.innerHTML = `
+                    <div class="container mt-4">
+                        <h2>Reports</h2>
+                        <div class="alert alert-danger">Access denied. Admin privileges required.</div>
+                    </div>
+                `;
+                render(page);
+                return;
+            }
+
+            const page = document.createElement('div');
+            page.innerHTML = /*html*/`
+                <div class="container mt-4">
+                    <h2>📊 Generate Reports</h2>
+                    <p class="text-muted">Generate comprehensive reports on volunteer activities and event management.</p>
+                    
+                    <div class="row mt-4">
+                        <!-- Volunteer Report Card -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">👥 Volunteer Report</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text">Generate a comprehensive report of all volunteers including:</p>
+                                    <ul class="small">
+                                        <li>Personal information and contact details</li>
+                                        <li>Skills and preferences</li>
+                                        <li>Availability schedule</li>
+                                        <li>Complete participation history</li>
+                                        <li>Total events participated</li>
+                                    </ul>
+                                    <div class="d-grid gap-2">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-outline-danger" id="volunteerPdfBtn">
+                                                📄 Download PDF
+                                            </button>
+                                            <button class="btn btn-outline-success" id="volunteerCsvBtn">
+                                                📊 Download CSV
+                                            </button>
+                                            <button class="btn btn-outline-info" id="volunteerJsonBtn">
+                                                💻 View JSON
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Event Report Card -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">📅 Event Report</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text">Generate a detailed report of all events including:</p>
+                                    <ul class="small">
+                                        <li>Event details and descriptions</li>
+                                        <li>Location and date information</li>
+                                        <li>Required skills and urgency level</li>
+                                        <li>Assigned volunteers list</li>
+                                        <li>Event status (Upcoming/Past)</li>
+                                    </ul>
+                                    <div class="d-grid gap-2">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-outline-danger" id="eventPdfBtn">
+                                                📄 Download PDF
+                                            </button>
+                                            <button class="btn btn-outline-success" id="eventCsvBtn">
+                                                📊 Download CSV
+                                            </button>
+                                            <button class="btn btn-outline-info" id="eventJsonBtn">
+                                                💻 View JSON
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Section -->
+                    <div id="reportResults" class="mt-4" style="display:none;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Report Preview</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="reportContent" style="max-height: 500px; overflow-y: auto;">
+                                    <!-- JSON results will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Spinner -->
+                    <div id="loadingSpinner" class="text-center mt-4" style="display:none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Generating report...</span>
+                        </div>
+                        <p class="mt-2">Generating report, please wait...</p>
+                    </div>
+                </div>
+            `;
+
+            // Helper function to download report with auth token
+            const downloadReport = async (type, format) => {
+                const token = localStorage.getItem('token');
+                const loadingDiv = document.getElementById('loadingSpinner');
+                const resultsDiv = document.getElementById('reportResults');
+                
+                loadingDiv.style.display = 'block';
+                resultsDiv.style.display = 'none';
+                
+                try {
+                    const response = await fetch(`/api/reports/${type}?format=${format}`, {
+                        headers: {
+                            'Authorization': token
+                        }
+                    });
+                    
+                    if (format === 'json') {
+                        const data = await response.json();
+                        loadingDiv.style.display = 'none';
+                        
+                        // Display JSON in the results section
+                        resultsDiv.style.display = 'block';
+                        document.getElementById('reportContent').innerHTML = `
+                            <pre class="mb-0">${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                    } else {
+                        // For PDF and CSV, create a download link
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `${type}_report.${format}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        loadingDiv.style.display = 'none';
+                        
+                        // Show success message
+                        alert(`✅ ${type} report has been downloaded as ${format.toUpperCase()}.`);
+                    }
+                } catch (error) {
+                    loadingDiv.style.display = 'none';
+                    console.error('Report generation error:', error);
+                    alert('❌ Failed to generate report. Please try again.');
+                }
+            };
+
+            // Attach event listeners to buttons
+            page.querySelector('#volunteerPdfBtn').addEventListener('click', () => downloadReport('volunteers', 'pdf'));
+            page.querySelector('#volunteerCsvBtn').addEventListener('click', () => downloadReport('volunteers', 'csv'));
+            page.querySelector('#volunteerJsonBtn').addEventListener('click', () => downloadReport('volunteers', 'json'));
+            
+            page.querySelector('#eventPdfBtn').addEventListener('click', () => downloadReport('events', 'pdf'));
+            page.querySelector('#eventCsvBtn').addEventListener('click', () => downloadReport('events', 'csv'));
+            page.querySelector('#eventJsonBtn').addEventListener('click', () => downloadReport('events', 'json'));
+
+            render(page);
+        }
     }
 
 ];
