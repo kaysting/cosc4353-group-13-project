@@ -99,5 +99,27 @@ const api = {
             const token = localStorage.getItem('token');
             return handleApiRequest(() => axios.get('/api/history', { headers: { Authorization: token } }));
         }
+    },
+
+     reports: {
+        getVolunteers: (format = 'json') => {
+            const token = localStorage.getItem('token');
+            return handleApiRequest(() => 
+                axios.get('/api/reports/volunteers', { 
+                    params: { format },
+                    headers: { Authorization: token } 
+                })
+            );
+        },
+        getEvents: (format = 'json') => {
+            const token = localStorage.getItem('token');
+            return handleApiRequest(() => 
+                axios.get('/api/reports/events', { 
+                    params: { format },
+                    headers: { Authorization: token } 
+                })
+            );
+        }
     }
+    
 };
