@@ -122,7 +122,9 @@ const routes = [
                 }
                 msg.style.color = 'green';
                 msg.textContent = 'Registration successful! Redirecting to login...';
-                setTimeout(() => {
+                setTimeout(async () => {
+                    // Update nav for logged out state
+                    updateNavLinks(null);
                     navigate('/login');
                 }, 1000);
             });
@@ -169,7 +171,15 @@ const routes = [
                 if (data.success) {
                     verificationMessage.style.color = 'green';
                     verificationMessage.textContent = 'Email verified! Redirecting to your profile...';
-                    setTimeout(() => {
+                    setTimeout(async () => {
+                        // Reload user info and update nav
+                        let userInfo = null;
+                        try {
+                            userInfo = await api.auth.getCurrentUser();
+                        } catch (e) {
+                            userInfo = null;
+                        }
+                        updateNavLinks(userInfo);
                         navigate('/profile');
                     }, 1000);
                 } else {
@@ -215,26 +225,20 @@ const routes = [
                 // Call API for login
                 const data = await api.auth.login(email, password);
                 if (data.success) {
-                    // Check if user is verified
-                    const userInfo = await api.auth.getCurrentUser();
-                    if (userInfo.is_email_verified) {
+                    updateNavLinks(data.user);
+                    if (data.is_email_verified) {
                         message.style.color = 'green';
                         message.textContent = 'Login successful! Redirecting...';
                         setTimeout(() => {
                             navigate('/profile');
                         }, 1000);
                     } else {
-                        // Should not happen, but fallback
-                        message.style.color = 'red';
-                        message.textContent = 'Email not verified. Please check your email.';
+                        message.style.color = 'orange';
+                        message.textContent = 'Email not verified. Redirecting to verification...';
+                        setTimeout(() => {
+                            navigate(`/register/verify?userId=${encodeURIComponent(data.user.id)}&email=${encodeURIComponent(data.user.email)}`);
+                        }, 1000);
                     }
-                } else if (data.code === 'email_not_verified') {
-                    // Redirect to verification page with userId/email
-                    message.style.color = 'orange';
-                    message.textContent = 'Email not verified. Redirecting to verification...';
-                    setTimeout(() => {
-                        navigate(`/register/verify?userId=${encodeURIComponent(data.userId)}&email=${encodeURIComponent(data.email)}`);
-                    }, 1000);
                 } else {
                     message.style.color = 'red';
                     message.textContent = data.message;
@@ -248,13 +252,7 @@ const routes = [
     {
         path: '/profile',
         handler: async () => {
-            // Check if user is verified before rendering profile
-            const userInfo = await api.auth.getCurrentUser();
-            if (!userInfo.is_email_verified) {
-                alert('Please verify your email before accessing your profile.');
-                navigate(`/register/verify?userId=${encodeURIComponent(userInfo.userId)}&email=${encodeURIComponent(userInfo.email)}`);
-                return;
-            }
+            // Removed email verification check before rendering profile
             const page = document.createElement('div');
             page.innerHTML = /*html*/`
                 <div class="container mt-5">
@@ -913,8 +911,8 @@ const routes = [
             render(page);
         }
     },
-    
-{
+
+    {
         path: '/admin/reports',
         handler: async () => {
             // Check admin access
@@ -1032,21 +1030,21 @@ const routes = [
                 const token = localStorage.getItem('token');
                 const loadingDiv = document.getElementById('loadingSpinner');
                 const resultsDiv = document.getElementById('reportResults');
-                
+
                 loadingDiv.style.display = 'block';
                 resultsDiv.style.display = 'none';
-                
+
                 try {
                     const response = await fetch(`/api/reports/${type}?format=${format}`, {
                         headers: {
                             'Authorization': token
                         }
                     });
-                    
+
                     if (format === 'json') {
                         const data = await response.json();
                         loadingDiv.style.display = 'none';
-                        
+
                         // Display JSON in the results section
                         resultsDiv.style.display = 'block';
                         document.getElementById('reportContent').innerHTML = `
@@ -1064,7 +1062,7 @@ const routes = [
                         a.click();
                         window.URL.revokeObjectURL(url);
                         loadingDiv.style.display = 'none';
-                        
+
                         // Show success message
                         alert(`✅ ${type} report has been downloaded as ${format.toUpperCase()}.`);
                     }
@@ -1079,7 +1077,7 @@ const routes = [
             page.querySelector('#volunteerPdfBtn').addEventListener('click', () => downloadReport('volunteers', 'pdf'));
             page.querySelector('#volunteerCsvBtn').addEventListener('click', () => downloadReport('volunteers', 'csv'));
             page.querySelector('#volunteerJsonBtn').addEventListener('click', () => downloadReport('volunteers', 'json'));
-            
+
             page.querySelector('#eventPdfBtn').addEventListener('click', () => downloadReport('events', 'pdf'));
             page.querySelector('#eventCsvBtn').addEventListener('click', () => downloadReport('events', 'csv'));
             page.querySelector('#eventJsonBtn').addEventListener('click', () => downloadReport('events', 'json'));
@@ -1124,12 +1122,80 @@ function handleRoute() {
     if (match) match.handler(match.params || {});
 }
 
+
+// Navigation visibility logic
+function updateNavLinks(userInfo) {
+    // Helper to show/hide by id
+    function show(id) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = '';
+    }
+    function hide(id) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    }
+
+    // Default: hide all
+    hide('nav-login');
+    hide('nav-register');
+    hide('nav-profile');
+    hide('nav-admin-create');
+    hide('nav-admin-edit');
+    hide('nav-notifications');
+    hide('nav-history');
+    hide('nav-admin-reports');
+    hide('nav-logout');
+
+    if (!userInfo || !userInfo.email) {
+        // Not logged in
+        show('nav-login');
+        show('nav-register');
+    } else {
+        // Logged in
+        show('nav-profile');
+        show('nav-notifications');
+        show('nav-history');
+        show('nav-logout');
+        if (userInfo.is_admin) {
+            show('nav-admin-create');
+            show('nav-admin-edit');
+            show('nav-admin-reports');
+        }
+    }
+}
+
 // Set up listeners
 window.addEventListener('popstate', handleRoute);
 
 // On page content load, set up app navigation links
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     handleRoute();
+
+    // Get user info (if logged in)
+    let userInfo = null;
+    try {
+        userInfo = await api.auth.getCurrentUser();
+    } catch (e) {
+        userInfo = null;
+    }
+    updateNavLinks(userInfo);
+
+    // Logout button logic
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            // Remove token and call API logout if available
+            localStorage.removeItem('token');
+            if (api.auth.logout) {
+                try { await api.auth.logout(); } catch (e) { }
+            }
+            // Reset nav and redirect
+            updateNavLinks(null);
+            navigate('/login');
+        };
+    }
+
+    // Set up SPA navigation for anchors
     const anchors = document.querySelectorAll('a');
     for (const anchor of anchors) {
         const href = anchor.getAttribute('href');
@@ -1236,7 +1302,7 @@ async function renderEventForm(mode, eventId = null) {
             urgency: form.urgency.value,
             date: form.eventDate.value
         };
-        
+
         console.log("Submitting event update:", payload); //debug line
 
         const result = mode === 'edit'

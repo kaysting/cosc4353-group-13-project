@@ -207,6 +207,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!valid) {
         return res.sendApiError(401, 'invalid_credentials', 'Invalid email or password');
     }
+    // Always return success: true, but include is_email_verified property
     if (!user.is_email_verified) {
         // Send verification code again
         if (config.mailgun_api_key) {
@@ -214,17 +215,20 @@ app.post('/api/auth/login', async (req, res) => {
                 console.error(`Failed to send verification email to ${user.email}:`, err);
             });
         }
-        return res.status(403).json({
-            success: false,
-            code: 'email_not_verified',
-            message: 'Email not verified. Please check your email for a verification code.',
-            userId: user.id,
-            email: user.email
-        });
     }
     const token = randomString(64, 'base64');
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
-    res.sendApiOkay({ token, userId: user.id, email: user.email });
+    return res.json({
+        success: true,
+        token,
+        user: {
+            id: user.id,
+            email: user.email,
+            is_admin: user.is_admin,
+            is_email_verified: user.is_email_verified
+        },
+        is_email_verified: user.is_email_verified
+    });
 });
 
 // Endpoint to get current user info (for client-side checks)

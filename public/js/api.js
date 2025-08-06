@@ -20,6 +20,7 @@ const api = {
         login: async (email, password) => {
             return handleApiRequest(async () => {
                 const response = await axios.post('/api/auth/login', { email, password });
+                // Always save token if present, even if not verified
                 if (response.data && response.data.token) {
                     localStorage.setItem('token', response.data.token);
                 }
@@ -73,7 +74,7 @@ const api = {
         },
         update: (eventInfo) => {
             const token = localStorage.getItem('token');
-            return handleApiRequest(() => axios.post('/api/events/update', eventInfo, {headers: { Authorization: token }}));
+            return handleApiRequest(() => axios.post('/api/events/update', eventInfo, { headers: { Authorization: token } }));
         },
         delete: (eventId) => { // NEW
             const token = localStorage.getItem('token');
@@ -101,25 +102,25 @@ const api = {
         }
     },
 
-     reports: {
+    reports: {
         getVolunteers: (format = 'json') => {
             const token = localStorage.getItem('token');
-            return handleApiRequest(() => 
-                axios.get('/api/reports/volunteers', { 
+            return handleApiRequest(() =>
+                axios.get('/api/reports/volunteers', {
                     params: { format },
-                    headers: { Authorization: token } 
+                    headers: { Authorization: token }
                 })
             );
         },
         getEvents: (format = 'json') => {
             const token = localStorage.getItem('token');
-            return handleApiRequest(() => 
-                axios.get('/api/reports/events', { 
+            return handleApiRequest(() =>
+                axios.get('/api/reports/events', {
                     params: { format },
-                    headers: { Authorization: token } 
+                    headers: { Authorization: token }
                 })
             );
         }
     }
-    
+
 };
