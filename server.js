@@ -8,6 +8,7 @@ const config = require('./config.json');
 const PDFDocument = require('pdfkit');
 const { createObjectCsvWriter } = require('csv-writer');
 const fs = require('fs');
+const path = require('path');
 
 const db = require('./db.js');
 
@@ -860,7 +861,198 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
     const format = req.query.format || 'json';
     
     try {
-        // ... (rest of the volunteer report code from the artifact)
+        // Fetch all volunteers with their profiles and skills
+        const volunteers = db.prepare(`
+            SELECT 
+                u.id,
+                u.email,
+                u.is_email_verified,
+                up.full_name,
+                up.address_1,
+                up.address_2,
+                up.city,
+                up.state,
+                up.zip_code,
+                up.preferences,
+                up.availability_start,
+                up.availability_end
+            FROM users u
+            LEFT JOIN user_profiles up ON u.id = up.user_id
+            WHERE u.is_admin = 0
+            ORDER BY up.full_name, u.email
+        `).all();
+
+        // Fetch skills and history for each volunteer
+        const getSkills = db.prepare(`SELECT skill FROM user_skills WHERE user_id = ?`);
+        const getHistory = db.prepare(`
+            SELECT 
+                e.name as event_name,
+                e.date as event_date,
+                e.location as event_location,
+                vh.status,
+                vh.assigned_at
+            FROM volunteer_history vh
+            JOIN events e ON vh.event_id = e.id
+            WHERE vh.user_id = ?
+            ORDER BY e.date DESC
+        `);
+
+        const volunteerData = volunteers.map(vol => {
+            const skills = getSkills.all(vol.id).map(s => s.skill);
+            const history = getHistory.all(vol.id);
+            
+            return {
+                id: vol.id,
+                email: vol.email,
+                emailVerified: vol.is_email_verified ? 'Yes' : 'No',
+                fullName: vol.full_name || 'Not provided',
+                address: `${vol.address_1 || ''} ${vol.address_2 || ''}`.trim() || 'Not provided',
+                city: vol.city || 'Not provided',
+                state: vol.state || 'Not provided',
+                zipCode: vol.zip_code || 'Not provided',
+                skills: skills.join(', ') || 'None',
+                preferences: vol.preferences || 'None',
+                availabilityStart: vol.availability_start || 'Not set',
+                availabilityEnd: vol.availability_end || 'Not set',
+                totalEvents: history.length,
+                completedEvents: history.filter(h => h.status === 'Completed').length,
+                upcomingEvents: history.filter(h => new Date(h.event_date) > new Date()).length,
+                history: history
+            };
+        });
+
+        // Generate report based on format
+        if (format === 'json') {
+            res.json({
+                success: true,
+                report_type: 'volunteers',
+                generated_at: new Date().toISOString(),
+                total_volunteers: volunteerData.length,
+                verified_volunteers: volunteerData.filter(v => v.emailVerified === 'Yes').length,
+                volunteers: volunteerData
+            });
+        } else if (format === 'csv') {
+            // Create temporary CSV file
+            const tempFile = path.join(__dirname, `volunteer_report_${Date.now()}.csv`);
+            
+            // Flatten data for CSV
+            const csvData = [];
+            volunteerData.forEach(vol => {
+                if (vol.history.length === 0) {
+                    csvData.push({
+                        email: vol.email,
+                        fullName: vol.fullName,
+                        city: vol.city,
+                        state: vol.state,
+                        zipCode: vol.zipCode,
+                        skills: vol.skills,
+                        totalEvents: vol.totalEvents,
+                        eventName: 'No events',
+                        eventDate: '',
+                        eventStatus: ''
+                    });
+                } else {
+                    vol.history.forEach(event => {
+                        csvData.push({
+                            email: vol.email,
+                            fullName: vol.fullName,
+                            city: vol.city,
+                            state: vol.state,
+                            zipCode: vol.zipCode,
+                            skills: vol.skills,
+                            totalEvents: vol.totalEvents,
+                            eventName: event.event_name,
+                            eventDate: event.event_date,
+                            eventStatus: event.status
+                        });
+                    });
+                }
+            });
+
+            const csvWriter = createObjectCsvWriter({
+                path: tempFile,
+                header: [
+                    { id: 'email', title: 'Email' },
+                    { id: 'fullName', title: 'Full Name' },
+                    { id: 'city', title: 'City' },
+                    { id: 'state', title: 'State' },
+                    { id: 'zipCode', title: 'Zip Code' },
+                    { id: 'skills', title: 'Skills' },
+                    { id: 'totalEvents', title: 'Total Events' },
+                    { id: 'eventName', title: 'Event Name' },
+                    { id: 'eventDate', title: 'Event Date' },
+                    { id: 'eventStatus', title: 'Status' }
+                ]
+            });
+
+            await csvWriter.writeRecords(csvData);
+            
+            res.download(tempFile, 'volunteer_report.csv', (err) => {
+                // Clean up temp file
+                fs.unlinkSync(tempFile);
+                if (err) {
+                    console.error('CSV download error:', err);
+                    res.sendApiError(500, 'download_error', 'Failed to download CSV');
+                }
+            });
+        } else if (format === 'pdf') {
+            // Create PDF document
+            const doc = new PDFDocument({ margin: 50 });
+            const chunks = [];
+            
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => {
+                const pdfBuffer = Buffer.concat(chunks);
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', 'attachment; filename=volunteer_report.pdf');
+                res.send(pdfBuffer);
+            });
+
+            // PDF Header
+            doc.fontSize(20).text('Volunteer Report', { align: 'center' });
+            doc.fontSize(10).text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
+            doc.moveDown();
+
+            // Summary Statistics
+            doc.fontSize(14).text('Summary Statistics', { underline: true });
+            doc.fontSize(10);
+            doc.text(`Total Volunteers: ${volunteerData.length}`);
+            doc.text(`Verified Accounts: ${volunteerData.filter(v => v.emailVerified === 'Yes').length}`);
+            doc.text(`Active Volunteers: ${volunteerData.filter(v => v.totalEvents > 0).length}`);
+            doc.moveDown();
+
+            // Volunteer Details
+            doc.fontSize(14).text('Volunteer Details', { underline: true });
+            doc.fontSize(10);
+            doc.moveDown();
+
+            volunteerData.forEach((vol, index) => {
+                // Check if we need a new page
+                if (doc.y > 650) {
+                    doc.addPage();
+                }
+
+                doc.fontSize(12).text(`${index + 1}. ${vol.fullName}`, { underline: true });
+                doc.fontSize(10);
+                doc.text(`   Email: ${vol.email} (${vol.emailVerified === 'Yes' ? 'Verified' : 'Unverified'})`);
+                doc.text(`   Location: ${vol.city}, ${vol.state} ${vol.zipCode}`);
+                doc.text(`   Skills: ${vol.skills}`);
+                doc.text(`   Availability: ${vol.availabilityStart} to ${vol.availabilityEnd}`);
+                doc.text(`   Total Events: ${vol.totalEvents} (${vol.completedEvents} completed, ${vol.upcomingEvents} upcoming)`);
+                
+                if (vol.history.length > 0) {
+                    doc.text('   Recent Events:');
+                    vol.history.slice(0, 3).forEach(event => {
+                        doc.text(`      - ${event.event_name} (${event.event_date}) - ${event.status}`);
+                    });
+                }
+                doc.moveDown();
+            });
+
+            doc.end();
+        } else {
+            res.sendApiError(400, 'invalid_format', 'Invalid format. Use json, csv, or pdf');
+        }
     } catch (err) {
         console.error('Volunteer report generation error:', err);
         res.sendApiError(500, 'report_error', 'Failed to generate volunteer report');
@@ -872,10 +1064,300 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
     const format = req.query.format || 'json';
     
     try {
-        // ... (rest of the event report code from the artifact)
+        // Fetch all events
+        const events = db.prepare(`
+            SELECT 
+                e.id,
+                e.name,
+                e.description,
+                e.location,
+                e.urgency,
+                e.date,
+                e.created_by,
+                u.email as creator_email
+            FROM events e
+            LEFT JOIN users u ON e.created_by = u.id
+            WHERE e.deleted = 0
+            ORDER BY e.date DESC
+        `).all();
+
+        // Fetch skills and assignments for each event
+        const getSkills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
+        const getAssignments = db.prepare(`
+            SELECT 
+                u.email,
+                up.full_name,
+                up.city,
+                up.state
+            FROM event_assignments ea
+            JOIN users u ON ea.user_id = u.id
+            LEFT JOIN user_profiles up ON u.id = up.user_id
+            WHERE ea.event_id = ?
+        `);
+
+        const eventData = events.map(event => {
+            const skills = getSkills.all(event.id).map(s => s.skill);
+            const assignments = getAssignments.all(event.id);
+            const eventDate = new Date(event.date);
+            const now = new Date();
+            
+            return {
+                id: event.id,
+                name: event.name,
+                description: event.description,
+                location: event.location,
+                urgency: event.urgency,
+                date: event.date,
+                formattedDate: eventDate.toLocaleDateString(),
+                status: eventDate > now ? 'Upcoming' : 'Past',
+                createdBy: event.creator_email || 'Unknown',
+                requiredSkills: skills.join(', ') || 'None',
+                volunteersAssigned: assignments.length,
+                volunteers: assignments.map(a => ({
+                    email: a.email,
+                    name: a.full_name || 'Not provided',
+                    location: `${a.city || 'Unknown'}, ${a.state || 'Unknown'}`
+                }))
+            };
+        });
+
+        // Calculate statistics
+        const stats = {
+            totalEvents: eventData.length,
+            upcomingEvents: eventData.filter(e => e.status === 'Upcoming').length,
+            pastEvents: eventData.filter(e => e.status === 'Past').length,
+            highUrgency: eventData.filter(e => e.urgency === 'high').length,
+            mediumUrgency: eventData.filter(e => e.urgency === 'medium').length,
+            lowUrgency: eventData.filter(e => e.urgency === 'low').length,
+            totalAssignments: eventData.reduce((sum, e) => sum + e.volunteersAssigned, 0),
+            averageVolunteersPerEvent: (eventData.reduce((sum, e) => sum + e.volunteersAssigned, 0) / eventData.length).toFixed(2)
+        };
+
+        // Generate report based on format
+        if (format === 'json') {
+            res.json({
+                success: true,
+                report_type: 'events',
+                generated_at: new Date().toISOString(),
+                statistics: stats,
+                events: eventData
+            });
+        } else if (format === 'csv') {
+            // Create temporary CSV file
+            const tempFile = path.join(__dirname, `event_report_${Date.now()}.csv`);
+            
+            // Flatten data for CSV
+            const csvData = [];
+            eventData.forEach(event => {
+                if (event.volunteers.length === 0) {
+                    csvData.push({
+                        eventName: event.name,
+                        eventDate: event.formattedDate,
+                        location: event.location,
+                        urgency: event.urgency,
+                        status: event.status,
+                        requiredSkills: event.requiredSkills,
+                        volunteersAssigned: 0,
+                        volunteerName: 'No volunteers',
+                        volunteerEmail: '',
+                        volunteerLocation: ''
+                    });
+                } else {
+                    event.volunteers.forEach(vol => {
+                        csvData.push({
+                            eventName: event.name,
+                            eventDate: event.formattedDate,
+                            location: event.location,
+                            urgency: event.urgency,
+                            status: event.status,
+                            requiredSkills: event.requiredSkills,
+                            volunteersAssigned: event.volunteersAssigned,
+                            volunteerName: vol.name,
+                            volunteerEmail: vol.email,
+                            volunteerLocation: vol.location
+                        });
+                    });
+                }
+            });
+
+            const csvWriter = createObjectCsvWriter({
+                path: tempFile,
+                header: [
+                    { id: 'eventName', title: 'Event Name' },
+                    { id: 'eventDate', title: 'Date' },
+                    { id: 'location', title: 'Location' },
+                    { id: 'urgency', title: 'Urgency' },
+                    { id: 'status', title: 'Status' },
+                    { id: 'requiredSkills', title: 'Required Skills' },
+                    { id: 'volunteersAssigned', title: 'Total Volunteers' },
+                    { id: 'volunteerName', title: 'Volunteer Name' },
+                    { id: 'volunteerEmail', title: 'Volunteer Email' },
+                    { id: 'volunteerLocation', title: 'Volunteer Location' }
+                ]
+            });
+
+            await csvWriter.writeRecords(csvData);
+            
+            res.download(tempFile, 'event_report.csv', (err) => {
+                // Clean up temp file
+                fs.unlinkSync(tempFile);
+                if (err) {
+                    console.error('CSV download error:', err);
+                    res.sendApiError(500, 'download_error', 'Failed to download CSV');
+                }
+            });
+        } else if (format === 'pdf') {
+            // Create PDF document
+            const doc = new PDFDocument({ margin: 50 });
+            const chunks = [];
+            
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => {
+                const pdfBuffer = Buffer.concat(chunks);
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', 'attachment; filename=event_report.pdf');
+                res.send(pdfBuffer);
+            });
+
+            // PDF Header
+            doc.fontSize(20).text('Event Report', { align: 'center' });
+            doc.fontSize(10).text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
+            doc.moveDown();
+
+            // Summary Statistics
+            doc.fontSize(14).text('Summary Statistics', { underline: true });
+            doc.fontSize(10);
+            doc.text(`Total Events: ${stats.totalEvents}`);
+            doc.text(`Upcoming Events: ${stats.upcomingEvents}`);
+            doc.text(`Past Events: ${stats.pastEvents}`);
+            doc.text(`High Urgency: ${stats.highUrgency}`);
+            doc.text(`Medium Urgency: ${stats.mediumUrgency}`);
+            doc.text(`Low Urgency: ${stats.lowUrgency}`);
+            doc.text(`Total Volunteer Assignments: ${stats.totalAssignments}`);
+            doc.text(`Average Volunteers per Event: ${stats.averageVolunteersPerEvent}`);
+            doc.moveDown();
+
+            // Event Details
+            doc.fontSize(14).text('Event Details', { underline: true });
+            doc.moveDown();
+
+            // Group events by status
+            const upcomingEvents = eventData.filter(e => e.status === 'Upcoming');
+            const pastEvents = eventData.filter(e => e.status === 'Past');
+
+            // Upcoming Events
+            if (upcomingEvents.length > 0) {
+                doc.fontSize(12).text('Upcoming Events:', { underline: true });
+                doc.fontSize(10);
+                upcomingEvents.forEach((event, index) => {
+                    if (doc.y > 650) {
+                        doc.addPage();
+                    }
+                    doc.text(`${index + 1}. ${event.name} - ${event.formattedDate}`);
+                    doc.text(`   Location: ${event.location}`);
+                    doc.text(`   Urgency: ${event.urgency.toUpperCase()}`);
+                    doc.text(`   Required Skills: ${event.requiredSkills}`);
+                    doc.text(`   Volunteers Assigned: ${event.volunteersAssigned}`);
+                    if (event.volunteers.length > 0) {
+                        doc.text('   Assigned Volunteers:');
+                        event.volunteers.slice(0, 5).forEach(vol => {
+                            doc.text(`      • ${vol.name} (${vol.email})`);
+                        });
+                        if (event.volunteers.length > 5) {
+                            doc.text(`      ... and ${event.volunteers.length - 5} more`);
+                        }
+                    }
+                    doc.moveDown(0.5);
+                });
+                doc.moveDown();
+            }
+
+            // Past Events
+            if (pastEvents.length > 0) {
+                doc.fontSize(12).text('Past Events:', { underline: true });
+                doc.fontSize(10);
+                pastEvents.forEach((event, index) => {
+                    if (doc.y > 650) {
+                        doc.addPage();
+                    }
+                    doc.text(`${index + 1}. ${event.name} - ${event.formattedDate}`);
+                    doc.text(`   Location: ${event.location}`);
+                    doc.text(`   Volunteers Participated: ${event.volunteersAssigned}`);
+                    doc.moveDown(0.5);
+                });
+            }
+
+            doc.end();
+        } else {
+            res.sendApiError(400, 'invalid_format', 'Invalid format. Use json, csv, or pdf');
+        }
     } catch (err) {
         console.error('Event report generation error:', err);
         res.sendApiError(500, 'report_error', 'Failed to generate event report');
+    }
+});
+
+// Optional: Add a summary dashboard endpoint
+app.get('/api/reports/dashboard', requireLogin, requireAdmin, async (req, res) => {
+    try {
+        const totalVolunteers = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_admin = 0').get().count;
+        const verifiedVolunteers = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_admin = 0 AND is_email_verified = 1').get().count;
+        const totalEvents = db.prepare('SELECT COUNT(*) as count FROM events WHERE deleted = 0').get().count;
+        const upcomingEvents = db.prepare('SELECT COUNT(*) as count FROM events WHERE deleted = 0 AND date > datetime("now")').get().count;
+        const totalAssignments = db.prepare('SELECT COUNT(*) as count FROM event_assignments').get().count;
+        
+        // Most active volunteers
+        const topVolunteers = db.prepare(`
+            SELECT 
+                u.email,
+                up.full_name,
+                COUNT(vh.event_id) as event_count
+            FROM users u
+            LEFT JOIN user_profiles up ON u.id = up.user_id
+            LEFT JOIN volunteer_history vh ON u.id = vh.user_id
+            WHERE u.is_admin = 0
+            GROUP BY u.id
+            ORDER BY event_count DESC
+            LIMIT 5
+        `).all();
+
+        // Most popular skills
+        const popularSkills = db.prepare(`
+            SELECT 
+                skill,
+                COUNT(*) as count
+            FROM user_skills
+            GROUP BY skill
+            ORDER BY count DESC
+            LIMIT 5
+        `).all();
+
+        res.json({
+            success: true,
+            dashboard: {
+                volunteers: {
+                    total: totalVolunteers,
+                    verified: verifiedVolunteers,
+                    unverified: totalVolunteers - verifiedVolunteers
+                },
+                events: {
+                    total: totalEvents,
+                    upcoming: upcomingEvents,
+                    past: totalEvents - upcomingEvents
+                },
+                assignments: {
+                    total: totalAssignments
+                },
+                topVolunteers: topVolunteers.map(v => ({
+                    name: v.full_name || v.email,
+                    eventCount: v.event_count
+                })),
+                popularSkills: popularSkills
+            }
+        });
+    } catch (err) {
+        console.error('Dashboard generation error:', err);
+        res.sendApiError(500, 'dashboard_error', 'Failed to generate dashboard');
     }
 });
 
