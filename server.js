@@ -48,66 +48,6 @@ const checkPassword = async (password, hash) => {
     return bcrypt.compare(password, hash);
 };
 
-// Helper to normalize user account data (not profile)
-function normalizeUser(user) {
-    return {
-        email: user.email || '',
-        password_hash: user.password_hash || '',
-        is_email_verified: !!user.is_email_verified,
-        is_admin: !!user.is_admin
-    };
-}
-
-// Helper to normalize user profile data
-function normalizeProfile(profile) {
-    return {
-        fullName: profile.fullName || '',
-        address1: profile.address1 || '',
-        address2: profile.address2 || '',
-        city: profile.city || '',
-        state: profile.state || '',
-        zipCode: profile.zipCode || '',
-        skills: Array.isArray(profile.skills) ? profile.skills : [],
-        preferences: profile.preferences || '',
-        availabilityStart: profile.availabilityStart || '',
-        availabilityEnd: profile.availabilityEnd || ''
-    };
-}
-
-// Helper to normalize event data
-function normalizeEvent(event) {
-    return {
-        id: event.id,
-        name: event.name || '',
-        description: event.description || '',
-        location: event.location || '',
-        skills: Array.isArray(event.skills) ? event.skills : [],
-        urgency: event.urgency || '',
-        date: event.date ? new Date(event.date).toISOString() : '',
-        createdBy: event.createdBy || ''
-    };
-}
-
-// Helper to normalize notification data
-function normalizeNotification(notification) {
-    return {
-        id: notification.id,
-        header: notification.header || '',
-        description: notification.description || '',
-        time: typeof notification.time === 'number' ? notification.time : Date.now(),
-        read: !!notification.read
-    };
-}
-
-// Helper to normalize volunteer history entry
-function normalizeHistoryEntry(entry) {
-    return {
-        eventId: entry.eventId,
-        status: entry.status || 'Assigned',
-        assignedAt: entry.assignedAt ? new Date(entry.assignedAt).toISOString() : new Date().toISOString()
-    };
-}
-
 const sendNotification = (recipientId, header, description) => {
     const notificationId = crypto.randomUUID();
     db.prepare(`
@@ -859,7 +799,7 @@ app.post('/api/auth/verify-email', (req, res) => {
 // Generate Volunteer Report
 app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) => {
     const format = req.query.format || 'json';
-    
+
     try {
         // Fetch all volunteers with their profiles and skills
         const volunteers = db.prepare(`
@@ -900,7 +840,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
         const volunteerData = volunteers.map(vol => {
             const skills = getSkills.all(vol.id).map(s => s.skill);
             const history = getHistory.all(vol.id);
-            
+
             return {
                 id: vol.id,
                 email: vol.email,
@@ -934,7 +874,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
         } else if (format === 'csv') {
             // Create temporary CSV file
             const tempFile = path.join(__dirname, `volunteer_report_${Date.now()}.csv`);
-            
+
             // Flatten data for CSV
             const csvData = [];
             volunteerData.forEach(vol => {
@@ -986,7 +926,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
             });
 
             await csvWriter.writeRecords(csvData);
-            
+
             res.download(tempFile, 'volunteer_report.csv', (err) => {
                 // Clean up temp file
                 fs.unlinkSync(tempFile);
@@ -999,7 +939,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
             // Create PDF document
             const doc = new PDFDocument({ margin: 50 });
             const chunks = [];
-            
+
             doc.on('data', chunk => chunks.push(chunk));
             doc.on('end', () => {
                 const pdfBuffer = Buffer.concat(chunks);
@@ -1039,7 +979,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
                 doc.text(`   Skills: ${vol.skills}`);
                 doc.text(`   Availability: ${vol.availabilityStart} to ${vol.availabilityEnd}`);
                 doc.text(`   Total Events: ${vol.totalEvents} (${vol.completedEvents} completed, ${vol.upcomingEvents} upcoming)`);
-                
+
                 if (vol.history.length > 0) {
                     doc.text('   Recent Events:');
                     vol.history.slice(0, 3).forEach(event => {
@@ -1062,7 +1002,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
 // Generate Event Report
 app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
     const format = req.query.format || 'json';
-    
+
     try {
         // Fetch all events
         const events = db.prepare(`
@@ -1100,7 +1040,7 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
             const assignments = getAssignments.all(event.id);
             const eventDate = new Date(event.date);
             const now = new Date();
-            
+
             return {
                 id: event.id,
                 name: event.name,
@@ -1145,7 +1085,7 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
         } else if (format === 'csv') {
             // Create temporary CSV file
             const tempFile = path.join(__dirname, `event_report_${Date.now()}.csv`);
-            
+
             // Flatten data for CSV
             const csvData = [];
             eventData.forEach(event => {
@@ -1197,7 +1137,7 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
             });
 
             await csvWriter.writeRecords(csvData);
-            
+
             res.download(tempFile, 'event_report.csv', (err) => {
                 // Clean up temp file
                 fs.unlinkSync(tempFile);
@@ -1210,7 +1150,7 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
             // Create PDF document
             const doc = new PDFDocument({ margin: 50 });
             const chunks = [];
-            
+
             doc.on('data', chunk => chunks.push(chunk));
             doc.on('end', () => {
                 const pdfBuffer = Buffer.concat(chunks);
@@ -1305,7 +1245,7 @@ app.get('/api/reports/dashboard', requireLogin, requireAdmin, async (req, res) =
         const totalEvents = db.prepare('SELECT COUNT(*) as count FROM events WHERE deleted = 0').get().count;
         const upcomingEvents = db.prepare('SELECT COUNT(*) as count FROM events WHERE deleted = 0 AND date > datetime("now")').get().count;
         const totalAssignments = db.prepare('SELECT COUNT(*) as count FROM event_assignments').get().count;
-        
+
         // Most active volunteers
         const topVolunteers = db.prepare(`
             SELECT 
