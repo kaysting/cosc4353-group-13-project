@@ -535,15 +535,6 @@ const routes = [
                     <label for="requiredSkills">Required Skills</label>
                     <small class="form-text text-muted">Hold Ctrl (Windows) or Command (Mac) to select multiple skills.</small>
                     <select id="requiredSkills" class="form-select mb-2" multiple required size="4">
-                        <option value="bilingual">Bilingual</option>
-                        <option value="carpentry">Carpentry</option>
-                        <option value="cooking">Cooking</option>
-                        <option value="cleaning">Cleaning</option>
-                        <option value="digital_marketing">Digital Marketing</option>
-                        <option value="first_aid">First Aid</option>
-                        <option value="physical_trainer">Physical Trainer</option>
-                        <option value="transport">Transport</option>
-                        <!-- Add more -->
                     </select>
 
                     <div class="input-group mb-2">
@@ -570,6 +561,21 @@ const routes = [
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
             `;
+
+            const skillsSelect = page.querySelector('#requiredSkills');
+            const loadSkills = async () => {
+                const result = await api.skills.getAll();
+                if (result.success) {
+                    skillsSelect.innerHTML = '';
+                    result.skills.forEach(skill => {
+                        const option = document.createElement('option');
+                        option.value = skill.label.toLowerCase().replace(/\s+/g, '_');
+                        option.textContent = skill.label;
+                        skillsSelect.appendChild(option);
+                    });
+                }
+            };
+            await loadSkills();
 
             // Basic client-side validation handler
             const form = page.querySelector('#eventForm');
@@ -611,55 +617,44 @@ const routes = [
             // Allow dynamic skill addition
             const addSkillBtn = page.querySelector('#addSkillBtn');
             const newSkillInput = page.querySelector('#newSkill');
-            const skillsSelect = page.querySelector('#requiredSkills');
+            //const skillsSelect = page.querySelector('#requiredSkills');
 
-            addSkillBtn.addEventListener('click', () => {
+           addSkillBtn.addEventListener('click', async () => {
                 const newSkill = newSkillInput.value.trim();
                 if (!newSkill) return;
 
-                const normalized = newSkill.toLowerCase();
-
-                // Check for duplicates (case-insensitive)
-                const existingOptions = Array.from(skillsSelect.options);
-                const isDuplicate = existingOptions.some(opt => opt.textContent.toLowerCase() === normalized);
-                if (isDuplicate) {
-                    alert(`"${newSkill}" is already in the skill list.`);
+                const existingLabels = Array.from(skillsSelect.options).map(o => o.textContent.toLowerCase());
+                if (existingLabels.includes(newSkill.toLowerCase())) {
+                    alert(`"${newSkill}" already exists.`);
                     return;
                 }
 
-                // Add new option
-                const option = document.createElement('option');
-                option.value = normalized.replace(/\s+/g, '_'); // e.g., "first aid" -> "first_aid"
-                option.textContent = newSkill;
-                option.selected = true;
-                skillsSelect.appendChild(option);
+                const result = await api.skills.add(newSkill);
+                if (!result.success) {
+                    alert(result.message || 'Failed to add skill');
+                    return;
+                }
 
-                // Sort options alphabetically
-                const allOptions = Array.from(skillsSelect.options);
-                allOptions.sort((a, b) => a.textContent.localeCompare(b.textContent));
-                skillsSelect.innerHTML = '';
-                allOptions.forEach(opt => skillsSelect.appendChild(opt));
-
-                // Clear input
+                await loadSkills(); // refresh skill list
                 newSkillInput.value = '';
-
-                // Confirmation popup
-                alert(`"${newSkill}" has been successfully added to the skill list.`);
+                alert(`"${newSkill}" has been added!`);
             });
 
             const removeSkillBtn = page.querySelector('#removeSkillBtn');
-            removeSkillBtn.addEventListener('click', () => {
+            removeSkillBtn.addEventListener('click', async () => {
                 const selectedOptions = Array.from(skillsSelect.selectedOptions);
-
                 if (selectedOptions.length === 0) {
                     alert('Please select at least one skill to remove.');
                     return;
                 }
+                if (!confirm('Are you sure you want to remove selected skill(s)?')) return;
 
-                const confirmDelete = confirm(`Are you sure you want to remove the selected skill(s)?`);
-                if (!confirmDelete) return;
+                for (const option of selectedOptions) {
+                    const label = option.textContent;
+                    await api.skills.remove(label);
+                }
 
-                selectedOptions.forEach(opt => opt.remove());
+                await loadSkills(); // refresh after deletion
             });
         }
     },
@@ -1226,6 +1221,7 @@ async function renderEventForm(mode, eventId = null) {
         date: ''
     };
 
+    // Fetch event data if editing
     if (mode === 'edit') {
         const response = await api.events.get(eventId);
         if (!response.success) {
@@ -1240,6 +1236,7 @@ async function renderEventForm(mode, eventId = null) {
         }
     }
 
+    // Set up form structure with an empty skill select (to populate after)
     form.innerHTML = `
         <div class="form-group mb-3">
             <label>Event Name</label>
@@ -1255,15 +1252,8 @@ async function renderEventForm(mode, eventId = null) {
         </div>
         <div class="form-group mb-3">
             <label>Required Skills</label>
-            <select id="requiredSkills" class="form-select mb-2" multiple size="4">
-                <option value="first_aid">First Aid</option>
-                <option value="cooking">Cooking</option>
-                <option value="cleaning">Cleaning</option>
-                <option value="transport">Transport</option>
-                <option value="bilingual">Bilingual</option>
-                <option value="carpentry">Carpentry</option>
-                <option value="digital_marketing">Digital Marketing</option>
-                <option value="physical_trainer">Physical Trainer</option>
+            <select id="requiredSkills" class="form-select mb-2" multiple size="6">
+                <!-- Skills will be loaded here -->
             </select>
         </div>
         <div class="form-group mb-3">
@@ -1282,19 +1272,39 @@ async function renderEventForm(mode, eventId = null) {
         <button type="submit" class="btn btn-primary">${mode === 'edit' ? 'Update' : 'Create'} Event</button>
     `;
 
-    // Pre-select skills
+    // 🌟 Dynamically load skills from DB and pre-select
     const skillsSelect = form.querySelector('#requiredSkills');
-    for (const option of skillsSelect.options) {
-        if (eventData.skills.includes(option.value)) {
-            option.selected = true;
-        }
-    }
 
+    const loadSkills = async () => {
+        const result = await api.skills.getAll();
+        if (result.success) {
+            skillsSelect.innerHTML = '';
+            result.skills.forEach(skill => {
+                const option = document.createElement('option');
+                const normalized = skill.label.toLowerCase().replace(/\s+/g, '_');
+                option.value = normalized;
+                option.textContent = skill.label;
+
+                // Pre-select if this skill is in the eventData
+                if (eventData.skills.includes(normalized)) {
+                    option.selected = true;
+                }
+
+                skillsSelect.appendChild(option);
+            });
+        } else {
+            skillsSelect.innerHTML = `<option disabled>Error loading skills</option>`;
+        }
+    };
+
+    await loadSkills();
+
+    // 📝 Form submit handler
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const payload = {
-            id: eventId,    //eventData.id, //|| eventId,
+            id: eventId,
             name: form.eventName.value.trim(),
             description: form.eventDescription.value.trim(),
             location: form.eventLocation.value.trim(),
@@ -1303,7 +1313,7 @@ async function renderEventForm(mode, eventId = null) {
             date: form.eventDate.value
         };
 
-        console.log("Submitting event update:", payload); //debug line
+        console.log("Submitting event update:", payload); // Debug line
 
         const result = mode === 'edit'
             ? await api.events.update(payload)
@@ -1311,7 +1321,7 @@ async function renderEventForm(mode, eventId = null) {
 
         if (result.success) {
             alert(`${mode === 'edit' ? 'Updated' : 'Created'} successfully!`);
-            navigate('/admin/events'); // Optional: redirect after save
+            navigate('/admin/events');
         } else {
             alert('Error: ' + result.message);
         }

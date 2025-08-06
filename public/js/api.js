@@ -121,6 +121,10 @@ const api = {
                 })
             );
         }
+    },
+    skills: {
+        getAll: () => handleApiRequest(() => axios.get('/api/skills')),
+        add: (label) => handleApiRequest(() => axios.post('/api/skills/add', { label })),
+        remove: (label) => handleApiRequest(() => axios.post('/api/skills/delete', { label }))
     }
-
 };

@@ -1305,6 +1305,55 @@ app.get('/api/reports/dashboard', requireLogin, requireAdmin, async (req, res) =
     }
 });
 
+// Get all skills
+app.get('/api/skills', (req, res) => {
+    try {
+        const skills = db.prepare('SELECT id, label FROM skills ORDER BY label ASC').all();
+        res.sendApiOkay({ skills });
+    } catch (err) {
+        console.error('Error loading skills:', err);
+        res.sendApiError(500, 'db_error', 'Failed to load skills');
+    }
+});
+
+// Add a new skill
+app.post('/api/skills/add', (req, res) => {
+    const { label } = req.body;
+    if (!label || typeof label !== 'string') {
+        return res.sendApiError(400, 'invalid_input', 'Skill label is required');
+    }
+
+    const trimmed = label.trim();
+    if (!trimmed) return res.sendApiError(400, 'invalid_label', 'Label cannot be empty');
+
+    try {
+        const id = crypto.randomUUID();
+        db.prepare(`INSERT INTO skills (id, label) VALUES (?, ?)`).run(id, trimmed);
+        res.sendApiOkay({ message: 'Skill added', id, label: trimmed });
+    } catch (err) {
+        console.error('Error adding skill:', err);
+        if (err.message.includes('UNIQUE')) {
+            res.sendApiError(400, 'duplicate_skill', 'Skill already exists');
+        } else {
+            res.sendApiError(500, 'db_error', 'Failed to add skill');
+        }
+    }
+});
+
+// Remove skill
+app.post('/api/skills/delete', (req, res) => {
+    const { label } = req.body;
+    if (!label) return res.sendApiError(400, 'missing_label', 'Skill label is required');
+
+    try {
+        db.prepare(`DELETE FROM skills WHERE label = ?`).run(label);
+        res.sendApiOkay({ message: 'Skill removed' });
+    } catch (err) {
+        console.error('Error deleting skill:', err);
+        res.sendApiError(500, 'db_error', 'Failed to delete skill');
+    }
+});
+
 
 // Catch-all route to serve the index.html file for any unmatched routes
 app.use((req, res, next) => {

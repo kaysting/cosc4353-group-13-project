@@ -24,6 +24,59 @@ db.prepare(`CREATE TABLE IF NOT EXISTS user_profiles (
     FOREIGN KEY(user_id) REFERENCES users(id)
 )`).run();
 
+db.prepare(`CREATE TABLE IF NOT EXISTS skills (
+    id TEXT PRIMARY KEY,
+    label TEXT UNIQUE NOT NULL
+)`).run();
+
+const allSkills = [
+    'Bilingual',
+    'Carpentry',
+    'Cooking',
+    'Cleaning',
+    'Digital Marketing',
+    'First Aid',
+    'Physical Trainer',
+    'Transport',
+    'Customer Service',
+    'Event Setup & Takedown',
+    'Food Preparation & Serving',
+    'Public Speaking',
+    'Childcare',
+    'First Aid / CPR',
+    'Transportation / Driving',
+    'Fundraising',
+    'Clerical / Office Work',
+    'Tutoring / Mentoring',
+    'Arts & Crafts',
+    'Photography / Videography',
+    'Social Media Management',
+    'Sign Language',
+    'Language Translation',
+    'Elder Care',
+    'Environmental Cleanup',
+    'Technical Support',
+    'Writing / Editing',
+    'Conflict Resolution',
+    'Music / Performing Arts',
+    'Animal Care',
+    'Physical Labor / Lifting',
+    'IT / Web Support',
+    'Coaching / Sports',
+    'Crisis Support / Counseling',
+    'Outreach / Community Engagement',
+    'Grant Writing',
+    'Marketing & Promotion',
+    'Data Entry & Management',
+    'Teaching / Instruction'
+];
+
+const insertSkill = db.prepare(`INSERT OR IGNORE INTO skills (id, label) VALUES (?, ?)`);
+
+for (const skill of allSkills) {
+    insertSkill.run(crypto.randomUUID(), skill);
+}
+
 db.prepare(`CREATE TABLE IF NOT EXISTS user_skills (
     user_id TEXT,
     skill TEXT,
