@@ -343,16 +343,7 @@ const routes = [
 
                         <div class="mb-3">
                             <label for="skills" class="form-label">Skills</label>
-                            <select id="skills" class="form-select" multiple required disabled>
-                                <option value="bilingual">Bilingual</option>
-                                <option value="carpentry">Carpentry</option>
-                                <option value="cooking">Cooking</option>
-                                <option value="cleaning">Cleaning</option>
-                                <option value="digital_marketing">Digital Marketing</option>
-                                <option value="first_aid">First Aid</option>
-                                <option value="physical_trainer">Physical Trainer</option>
-                                <option value="transport">Transport</option>
-                            </select>
+                            <select id="skills" class="form-select" multiple required disabled></select>
                         </div>
 
                         <div class="mb-3">
@@ -405,6 +396,22 @@ const routes = [
                 (async () => {
                     try {
                         const data = await api.profile.get();
+
+                        // Fetch all available skills from backend
+                        const skillsResponse = await api.skills.getAll();
+                        if (skillsResponse.success) {
+                            inputSkills.innerHTML = ''; // Clear any previous entries
+
+                            skillsResponse.skills.forEach(skill => {
+                                const normalized = skill.label.toLowerCase().replace(/\s+/g, '_');
+                                const option = document.createElement('option');
+                                option.value = normalized;
+                                option.textContent = skill.label;
+                                option.selected = data.skills?.includes(normalized);
+                                inputSkills.appendChild(option);
+                            });
+                        }
+                        
                         inputFullName.value = data.fullName || '';
                         inputAddress1.value = data.address1 || '';
                         inputAddress2.value = data.address2 || '';
@@ -1299,7 +1306,7 @@ async function renderEventForm(mode, eventId = null) {
 
     await loadSkills();
 
-    // 📝 Form submit handler
+    // Form submit handler
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 

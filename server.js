@@ -107,7 +107,13 @@ const requireLogin = (req, res, next) => {
         return res.sendApiError(500, 'user_not_found', 'User not found for the given token');
     }
     const profileRow = db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(req.userId);
-    const skills = db.prepare('SELECT skill FROM user_skills WHERE user_id = ?').all(req.userId).map(row => row.skill);
+
+    const skills = db.prepare(`
+        SELECT s.label FROM user_skills us
+        JOIN skills s ON us.skill_id = s.id
+        WHERE us.user_id = ?
+    `).all(req.userId).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
+
     req.profile = { ...(profileRow || {}), skills };
     next();
 };
@@ -257,8 +263,10 @@ app.get('/api/profile', requireLogin, (req, res) => {
             WHERE user_id = ?
         `).get(req.userId);
         const skills = db.prepare(`
-            SELECT skill FROM user_skills WHERE user_id = ?
-        `).all(req.userId).map(row => row.skill);
+            SELECT s.label FROM user_skills us
+            JOIN skills s ON us.skill_id = s.id
+            WHERE us.user_id = ?
+        `).all(req.userId).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
 
         const profile = {
             fullName: row?.full_name || '',
@@ -272,7 +280,7 @@ app.get('/api/profile', requireLogin, (req, res) => {
             availabilityStart: row?.availability_start || '',
             availabilityEnd: row?.availability_end || ''
         };
-        res.sendApiOkay(profile);
+        res.sendApiOkay(req.profile);
     } catch (err) {
         console.error(err);
         res.sendApiError(500, 'db_error', 'Failed to load user profile');
@@ -346,10 +354,15 @@ app.post('/api/profile/update', requireLogin, (req, res) => {
         // Replacing skills (done by deleting and inserting)
         db.prepare(`DELETE FROM user_skills WHERE user_id = ?`).run(req.userId);
 
-        const insertSkill = db.prepare(`INSERT INTO user_skills (user_id, skill) VALUES (?, ?)`);
+        const insertSkill = db.prepare(`INSERT INTO user_skills (user_id, skill_id) VALUES (?, ?)`);
+        const getSkillId = db.prepare(`SELECT id FROM skills WHERE LOWER(REPLACE(label, ' ', '_')) = ?`);
+
         if (Array.isArray(skills)) {
             for (const skill of skills) {
-                insertSkill.run(req.userId, skill);
+                const row = getSkillId.get(skill.toLowerCase());
+                if (row) {
+                    insertSkill.run(req.userId, row.id);
+                }
             }
         }
         res.sendApiOkay({ message: 'Profile updated successfully!' });
@@ -393,9 +406,13 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
     `).all(userId);
 
     // Fetch skills for each event
-    const skillStmt = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
+    const skillStmt = db.prepare(`
+        SELECT s.label FROM event_skills es
+        JOIN skills s ON es.skill_id = s.id
+        WHERE es.event_id = ?
+    `);
     assignedEvents.forEach(event => {
-        const skills = skillStmt.all(event.id).map(row => row.skill);
+        const skills = skillStmt.all(event.id).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
         event.skills = skills;
     });
 
@@ -407,15 +424,21 @@ app.post('/api/profile/events', requireLogin, (req, res) => {
 app.get('/api/events', requireLogin, requireAdmin, (req, res) => {
     const events = db.prepare(`SELECT * FROM events WHERE deleted = 0`).all();
 
-    // Attach skills to each event
-    const getSkills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
-    for (const event of events) {
-        const skills = getSkills.all(event.id).map(s => s.skill);
-        event.skills = skills;
-    }
+    // Prepare the statement once
+    const getSkills = db.prepare(`
+        SELECT s.label FROM event_skills es
+        JOIN skills s ON es.skill_id = s.id
+        WHERE es.event_id = ?
+    `);
 
-    console.log(`Admin ${req.userId} fetched all events (${events.length} total)`); ///////
-    res.sendApiOkay({ events });
+    // Attach skills to each event
+    const enrichedEvents = events.map(event => {
+        const skills = getSkills.all(event.id).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
+        return { ...event, skills };
+    });
+
+    console.log(`Admin ${req.userId} fetched all events (${events.length} total)`);
+    res.sendApiOkay({ events: enrichedEvents });
 });
 
 // Get a single event (admin only)
@@ -429,7 +452,12 @@ app.get('/api/events/event', requireLogin, requireAdmin, (req, res) => {
     }
 
     // Fetch skills for this event
-    const skills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`).all(eventId).map(s => s.skill);
+    const skills = db.prepare(`
+        SELECT s.label FROM event_skills es
+        JOIN skills s ON es.skill_id = s.id
+        WHERE es.event_id = ?
+    `).all(event.id).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
+
     event.skills = skills;
 
     console.log(`Admin ${req.userId} fetched event ${eventId} with skills:`, skills); ///////
@@ -471,16 +499,16 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
         console.log(`Inserted event: ${eventId} - ${name}`);
 
         // Insert skills
-        const insertSkill = db.prepare(`
-            INSERT INTO event_skills (event_id, skill) VALUES (?, ?)
-        `);
+        const insertSkill = db.prepare(`INSERT INTO event_skills (event_id, skill_id) VALUES (?, ?)`);
+        const getSkillId = db.prepare(`SELECT id FROM skills WHERE LOWER(REPLACE(label, ' ', '_')) = ?`);
 
         for (const skill of skills) {
-            if (skill && typeof skill === 'string') {
-                insertSkill.run(eventId, skill);
-                console.log(`Inserted skill for event ${eventId}: ${skill}`);
+            const row = getSkillId.get(skill.toLowerCase());
+            if (row) {
+                insertSkill.run(eventId, row.id);
+                console.log(`Inserted skill for event ${eventId}: ${skill}`);       
             }
-        }
+        }     
     });
 
     try {
@@ -521,10 +549,13 @@ app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
 
         // Replace skills
         db.prepare(`DELETE FROM event_skills WHERE event_id = ?`).run(id);
-        const insertSkill = db.prepare(`INSERT INTO event_skills (event_id, skill) VALUES (?, ?)`);
+        
+        const insertSkill = db.prepare(`INSERT INTO event_skills (event_id, skill_id) VALUES (?, ?)`);
+        const getSkillId = db.prepare(`SELECT id FROM skills WHERE LOWER(REPLACE(label, ' ', '_')) = ?`);
         for (const skill of skills) {
-            if (skill && typeof skill === 'string') {
-                insertSkill.run(id, skill);
+            const row = getSkillId.get(skill.toLowerCase());
+            if (row) {
+                insertSkill.run(id, row.id);
                 console.log(`Inserted skill for event ${id}: ${skill}`);
             }
         }
@@ -535,7 +566,11 @@ app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
 
         // Fetch updated event + skills
         const updatedEvent = db.prepare(`SELECT * FROM events WHERE id = ?`).get(id);
-        updatedEvent.skills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`).all(id).map(r => r.skill);
+        updatedEvent.skills = db.prepare(`
+            SELECT s.label FROM event_skills es
+            JOIN skills s ON es.skill_id = s.id
+            WHERE es.event_id = ?
+        `).all(id).map(r => r.label.toLowerCase().replace(/\s+/g, '_'));
 
         // Notify assigned volunteers
         const assignedVolunteers = db.prepare(`
@@ -577,8 +612,10 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
 
     // Get required skills for the event
     const requiredSkills = db.prepare(`
-        SELECT skill FROM event_skills WHERE event_id = ?
-    `).all(eventId).map(row => row.skill);
+        SELECT s.label FROM event_skills es
+        JOIN skills s ON es.skill_id = s.id
+        WHERE es.event_id = ?
+    `).all(eventId).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
 
     // Get already assigned volunteers
     const assignedVolunteers = db.prepare(`
@@ -593,12 +630,17 @@ app.get('/api/events/match/check', requireLogin, requireAdmin, (req, res) => {
         WHERE u.is_admin = 0
     `).all();
 
-    const getUserSkills = db.prepare(`SELECT skill FROM user_skills WHERE user_id = ?`);
+    //const getUserSkills = db.prepare(`SELECT skill FROM user_skills WHERE user_id = ?`);
+    const getUserSkills = db.prepare(`
+        SELECT s.label FROM user_skills us
+        JOIN skills s ON us.skill_id = s.id
+        WHERE us.user_id = ?
+    `);
 
     const matchingVolunteers = volunteers
         .filter(vol => !assignedVolunteers.includes(vol.id)) // Exclude assigned
         .map(vol => {
-            const volSkills = getUserSkills.all(vol.id).map(row => row.skill);
+            const volSkills = getUserSkills.all(vol.id).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
             const hasRequiredSkills = requiredSkills.every(skill => volSkills.includes(skill));
 
             // Check availability
@@ -742,9 +784,11 @@ app.get('/api/history', requireLogin, (req, res) => {
         `).all(req.userId);
 
         // Get skills for each event
-        const getSkills = db.prepare(`
-            SELECT skill FROM event_skills WHERE event_id = ?
-        `);
+        const skills = db.prepare(`
+            SELECT s.label FROM event_skills es
+            JOIN skills s ON es.skill_id = s.id
+            WHERE es.event_id = ?
+        `).all(event.id).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
 
         const historyWithDetails = history.map(entry => ({
             eventId: entry.event_id,
@@ -827,7 +871,11 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
         `).all();
 
         // Fetch skills and history for each volunteer
-        const getSkills = db.prepare(`SELECT skill FROM user_skills WHERE user_id = ?`);
+        const getSkills = db.prepare(`
+            SELECT s.label FROM user_skills us
+            JOIN skills s ON us.skill_id = s.id
+            WHERE us.user_id = ?
+        `).all(userId)
         const getHistory = db.prepare(`
             SELECT 
                 e.name as event_name,
@@ -1026,7 +1074,11 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
         `).all();
 
         // Fetch skills and assignments for each event
-        const getSkills = db.prepare(`SELECT skill FROM event_skills WHERE event_id = ?`);
+        const getSkills = db.prepare(`
+            SELECT s.label FROM event_skills es
+            JOIN skills s ON es.skill_id = s.id
+            WHERE es.event_id = ?
+        `);
         const getAssignments = db.prepare(`
             SELECT 
                 u.email,
@@ -1040,7 +1092,7 @@ app.get('/api/reports/events', requireLogin, requireAdmin, async (req, res) => {
         `);
 
         const eventData = events.map(event => {
-            const skills = getSkills.all(event.id).map(s => s.skill);
+            const skills = getSkills.all(event.id).map(s => s.label);
             const assignments = getAssignments.all(event.id);
             const eventDate = new Date(event.date);
             const now = new Date();

@@ -79,9 +79,10 @@ for (const skill of allSkills) {
 
 db.prepare(`CREATE TABLE IF NOT EXISTS user_skills (
     user_id TEXT,
-    skill TEXT,
-    PRIMARY KEY(user_id, skill),
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    skill_id TEXT,
+    PRIMARY KEY(user_id, skill_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(skill_id) REFERENCES skills(id)
 )`).run();
 
 db.prepare(`CREATE TABLE IF NOT EXISTS events (
@@ -98,9 +99,10 @@ db.prepare(`CREATE TABLE IF NOT EXISTS events (
 
 db.prepare(`CREATE TABLE IF NOT EXISTS event_skills (
     event_id TEXT,
-    skill TEXT,
-    PRIMARY KEY(event_id, skill),
-    FOREIGN KEY(event_id) REFERENCES events(id)
+    skill_id TEXT,
+    PRIMARY KEY(event_id, skill_id),
+    FOREIGN KEY(event_id) REFERENCES events(id),
+    FOREIGN KEY(skill_id) REFERENCES skills(id)
 )`).run();
 
 db.prepare(`CREATE TABLE IF NOT EXISTS notifications (
