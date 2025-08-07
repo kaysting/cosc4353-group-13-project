@@ -1471,6 +1471,7 @@ function updateNavLinks(userInfo) {
         if (userInfo.is_admin) {
             show('nav-admin-create');
             show('nav-admin-edit');
+            show('nav-admin-matching');
             show('nav-admin-reports');
         }
     }
