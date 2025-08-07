@@ -1090,6 +1090,316 @@ const routes = [
 
 ];
 
+{
+    path: '/admin/volunteer-matching',
+    handler: async () => {
+        // Check admin access
+        const currentUser = await api.auth.getCurrentUser();
+        if (!currentUser || !currentUser.is_admin) {
+            const page = document.createElement('div');
+            page.innerHTML = `
+                <div class="container mt-4">
+                    <h2>Volunteer Matching</h2>
+                    <div class="alert alert-danger">Access denied. Admin privileges required.</div>
+                </div>
+            `;
+            render(page);
+            return;
+        }
+
+        const page = document.createElement('div');
+        page.innerHTML = `
+            <div class="container mt-4">
+                <h2>🎯 Volunteer Matching System</h2>
+                <p class="text-muted">Match and assign volunteers to events based on skills, location, and availability</p>
+
+                <!-- Event Selection -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">📅 Select Event</h5>
+                    </div>
+                    <div class="card-body">
+                        <select id="eventSelect" class="form-select">
+                            <option value="">-- Select an event --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Event Details -->
+                <div id="eventDetails" class="card mb-4" style="display:none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <div class="card-body">
+                        <h5 class="card-title" id="eventName"></h5>
+                        <p class="card-text" id="eventDescription"></p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>📍 Location:</strong> <span id="eventLocation"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>📆 Date:</strong> <span id="eventDate"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>⚡ Urgency:</strong> <span id="eventUrgency" class="badge bg-warning text-dark"></span>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <strong>🔧 Required Skills:</strong>
+                            <div id="eventSkills"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Matching Results -->
+                <div id="matchingSection" style="display:none;">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">✅ Matching Volunteers</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <button id="findMatchesBtn" class="btn btn-primary">🔍 Find Matching Volunteers</button>
+                                <button id="assignSelectedBtn" class="btn btn-success ms-2" style="display:none;">✔️ Assign Selected</button>
+                                <button id="selectAllBtn" class="btn btn-outline-secondary ms-2" style="display:none;">Select All</button>
+                                <button id="deselectAllBtn" class="btn btn-outline-secondary ms-2" style="display:none;">Deselect All</button>
+                            </div>
+                            
+                            <div id="matchResults" class="row"></div>
+                            
+                            <div id="noMatches" class="alert alert-warning" style="display:none;">
+                                No matching volunteers found for this event. The volunteers may not have the required skills, be available on the event date, or be in the right location.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Already Assigned Volunteers -->
+                <div id="assignedSection" class="card mt-4" style="display:none;">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">👥 Already Assigned Volunteers</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="assignedList"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        render(page);
+
+        // Load all events
+        const loadEvents = async () => {
+            const token = localStorage.getItem('token');
+            const response = await api.events.getAll();
+            
+            const eventSelect = document.getElementById('eventSelect');
+            eventSelect.innerHTML = '<option value="">-- Select an event --</option>';
+            
+            if (response.success && response.events) {
+                response.events.forEach(event => {
+                    const option = document.createElement('option');
+                    option.value = event.id;
+                    option.textContent = `${event.name} - ${new Date(event.date).toLocaleDateString()}`;
+                    eventSelect.appendChild(option);
+                });
+            }
+        };
+
+        await loadEvents();
+
+        let selectedEvent = null;
+        let matchingVolunteers = [];
+        let selectedVolunteers = new Set();
+
+        // Event selection handler
+        document.getElementById('eventSelect').addEventListener('change', async (e) => {
+            const eventId = e.target.value;
+            
+            if (!eventId) {
+                document.getElementById('eventDetails').style.display = 'none';
+                document.getElementById('matchingSection').style.display = 'none';
+                document.getElementById('assignedSection').style.display = 'none';
+                return;
+            }
+
+            // Get event details
+            const token = localStorage.getItem('token');
+            const eventResponse = await api.events.get(eventId);
+            
+            if (eventResponse.success && eventResponse.event) {
+                selectedEvent = eventResponse.event;
+                
+                // Display event details
+                document.getElementById('eventName').textContent = selectedEvent.name;
+                document.getElementById('eventDescription').textContent = selectedEvent.description;
+                document.getElementById('eventLocation').textContent = selectedEvent.location;
+                document.getElementById('eventDate').textContent = new Date(selectedEvent.date).toLocaleDateString();
+                document.getElementById('eventUrgency').textContent = selectedEvent.urgency.toUpperCase();
+                
+                // Display required skills
+                const skillsContainer = document.getElementById('eventSkills');
+                skillsContainer.innerHTML = '';
+                if (selectedEvent.skills && selectedEvent.skills.length > 0) {
+                    selectedEvent.skills.forEach(skill => {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge bg-primary me-2';
+                        badge.textContent = skill.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        skillsContainer.appendChild(badge);
+                    });
+                } else {
+                    skillsContainer.innerHTML = '<span class="text-white-50">No specific skills required</span>';
+                }
+                
+                document.getElementById('eventDetails').style.display = 'block';
+                document.getElementById('matchingSection').style.display = 'block';
+                
+                // Reset matching results
+                document.getElementById('matchResults').innerHTML = '';
+                document.getElementById('noMatches').style.display = 'none';
+                document.getElementById('assignSelectedBtn').style.display = 'none';
+                document.getElementById('selectAllBtn').style.display = 'none';
+                document.getElementById('deselectAllBtn').style.display = 'none';
+                selectedVolunteers.clear();
+            }
+        });
+
+        // Find matches handler
+        document.getElementById('findMatchesBtn').addEventListener('click', async () => {
+            if (!selectedEvent) return;
+            
+            const token = localStorage.getItem('token');
+            const response = await api.events.matchCheck(selectedEvent.id);
+            
+            const matchResults = document.getElementById('matchResults');
+            matchResults.innerHTML = '';
+            
+            if (response.success && response.volunteers && response.volunteers.length > 0) {
+                matchingVolunteers = response.volunteers;
+                document.getElementById('noMatches').style.display = 'none';
+                document.getElementById('assignSelectedBtn').style.display = 'inline-block';
+                document.getElementById('selectAllBtn').style.display = 'inline-block';
+                document.getElementById('deselectAllBtn').style.display = 'inline-block';
+                
+                matchingVolunteers.forEach(volunteer => {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-6 mb-3';
+                    
+                    const card = document.createElement('div');
+                    card.className = 'card volunteer-card';
+                    card.dataset.volunteerId = volunteer.userId;
+                    
+                    // Calculate match score
+                    const matchedSkills = selectedEvent.skills ? 
+                        volunteer.skills.filter(skill => selectedEvent.skills.includes(skill)) : [];
+                    const matchScore = selectedEvent.skills ? 
+                        Math.round((matchedSkills.length / selectedEvent.skills.length) * 100) : 100;
+                    
+                    card.innerHTML = `
+                        <div class="card-body">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input volunteer-checkbox" type="checkbox" value="${volunteer.userId}" id="vol_${volunteer.userId}">
+                                <label class="form-check-label" for="vol_${volunteer.userId}">
+                                <h6 class="mb-1">${volunteer.name}</h6>
+                                </label>
+                            </div>
+                            <p class="text-muted small mb-2">${volunteer.email}</p>
+                            <p class="mb-2">📍 ${volunteer.location}</p>
+                            <div class="mb-2">
+                                <strong>Skills:</strong><br>
+                                ${volunteer.skills.map(skill => {
+                                    const isMatched = matchedSkills.includes(skill);
+                                    const skillName = skill.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                    return `<span class="badge ${isMatched ? 'bg-success' : 'bg-secondary'} me-1">${skillName}</span>`;
+                                }).join('') || '<span class="text-muted">No skills listed</span>'}
+                            </div>
+                            <div class="text-end">
+                                <span class="match-score">Match Score: ${matchScore}%</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    col.appendChild(card);
+                    matchResults.appendChild(col);
+                    
+                    // Add click handler for card selection
+                    card.addEventListener('click', (e) => {
+                        if (e.target.type !== 'checkbox') {
+                            const checkbox = card.querySelector('.volunteer-checkbox');
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change'));
+                        }
+                    });
+                    
+                    // Add change handler for checkbox
+                    card.querySelector('.volunteer-checkbox').addEventListener('change', (e) => {
+                        if (e.target.checked) {
+                            selectedVolunteers.add(volunteer.userId);
+                            card.classList.add('selected');
+                        } else {
+                            selectedVolunteers.delete(volunteer.userId);
+                            card.classList.remove('selected');
+                        }
+                    });
+                });
+            } else {
+                document.getElementById('noMatches').style.display = 'block';
+                document.getElementById('assignSelectedBtn').style.display = 'none';
+                document.getElementById('selectAllBtn').style.display = 'none';
+                document.getElementById('deselectAllBtn').style.display = 'none';
+            }
+        });
+
+        // Select all handler
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            document.querySelectorAll('.volunteer-checkbox').forEach(checkbox => {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+        });
+
+        // Deselect all handler
+        document.getElementById('deselectAllBtn').addEventListener('click', () => {
+            document.querySelectorAll('.volunteer-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+        });
+
+        // Assign selected volunteers
+        document.getElementById('assignSelectedBtn').addEventListener('click', async () => {
+            if (selectedVolunteers.size === 0) {
+                alert('Please select at least one volunteer to assign.');
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to assign ${selectedVolunteers.size} volunteer(s) to this event?`)) {
+                return;
+            }
+            
+            const token = localStorage.getItem('token');
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const volunteerId of selectedVolunteers) {
+                const response = await api.events.matchAssign(selectedEvent.id, volunteerId);
+                if (response.success) {
+                    successCount++;
+                } else {
+                    failCount++;
+                    console.error(`Failed to assign volunteer ${volunteerId}:`, response.message);
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(`✅ Successfully assigned ${successCount} volunteer(s)!${failCount > 0 ? ` (${failCount} failed)` : ''}`);
+                
+                // Refresh the matching results
+                document.getElementById('findMatchesBtn').click();
+            } else {
+                alert(`❌ Failed to assign volunteers. Please try again.`);
+            }
+        });
+    }
+}
+
 // Path matcher: supports one :placeholder per path segment
 function matchRoute(path) {
     for (const route of routes) {
