@@ -268,7 +268,7 @@ app.get('/api/profile', requireLogin, (req, res) => {
             WHERE us.user_id = ?
         `).all(req.userId).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
 
-        const profile = {
+        req.profile = {
             fullName: row?.full_name || '',
             address1: row?.address_1 || '',
             address2: row?.address_2 || '',

@@ -347,7 +347,7 @@ const routes = [
                         </div>
 
                         <div class="mb-3">
-                            <label for="preferences" class="form-label">Preferences</label>
+                            <label for="preferences" class="form-label">Preferences (Optional)</label>
                             <textarea id="preferences" class="form-control" rows="3" readonly></textarea>
                         </div>
 
