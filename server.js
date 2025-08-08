@@ -268,7 +268,7 @@ app.get('/api/profile', requireLogin, (req, res) => {
             WHERE us.user_id = ?
         `).all(req.userId).map(row => row.label.toLowerCase().replace(/\s+/g, '_'));
 
-        const profile = {
+        req.profile = {
             fullName: row?.full_name || '',
             address1: row?.address_1 || '',
             address2: row?.address_2 || '',
@@ -1379,7 +1379,7 @@ app.post('/api/skills/add', (req, res) => {
     if (!trimmed) return res.sendApiError(400, 'invalid_label', 'Label cannot be empty');
 
     try {
-        const id = crypto.randomUUID();
+        const id = crypto.randomUUID().slice(0, 8);
         db.prepare(`INSERT INTO skills (id, label) VALUES (?, ?)`).run(id, trimmed);
         res.sendApiOkay({ message: 'Skill added', id, label: trimmed });
     } catch (err) {
@@ -1392,14 +1392,42 @@ app.post('/api/skills/add', (req, res) => {
     }
 });
 
-// Remove skill
 app.post('/api/skills/delete', (req, res) => {
     const { label } = req.body;
+
     if (!label) return res.sendApiError(400, 'missing_label', 'Skill label is required');
 
     try {
-        db.prepare(`DELETE FROM skills WHERE label = ?`).run(label);
-        res.sendApiOkay({ message: 'Skill removed' });
+        // Normalize label
+        const normalized = label.toLowerCase().replace(/\s+/g, '_');
+
+        // Lookup skill ID using normalized label
+        const skillRow = db.prepare(`
+            SELECT id FROM skills WHERE LOWER(REPLACE(label, ' ', '_')) = ?
+        `).get(normalized);
+
+        if (!skillRow) {
+            return res.sendApiError(404, 'not_found', 'Skill not found.');
+        }
+
+        const skillId = skillRow.id;
+
+        // Optional: prevent deletion if skill is in use
+        const usageCheck = db.prepare(`
+            SELECT COUNT(*) AS count FROM (
+                SELECT skill_id FROM user_skills WHERE skill_id = ?
+                UNION ALL
+                SELECT skill_id FROM event_skills WHERE skill_id = ?
+            )
+        `).get(skillId, skillId);
+
+        if (usageCheck.count > 0) {
+            return res.sendApiError(400, 'skill_in_use', 'Cannot delete skill that is currently assigned.');
+        }
+
+        db.prepare(`DELETE FROM skills WHERE id = ?`).run(skillId);
+        res.sendApiOkay({ message: 'Skill removed successfully.' });
+
     } catch (err) {
         console.error('Error deleting skill:', err);
         res.sendApiError(500, 'db_error', 'Failed to delete skill');
