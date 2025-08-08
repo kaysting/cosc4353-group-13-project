@@ -79,13 +79,13 @@ const sendEmail = async (senderName, to, subject, text) => {
     await mg.messages.create(config.mailgun_domain, data);
 };
 
-const sendVerificationEmail = async (email) => {
+const sendVerificationEmail = async (address) => {
     const code = randomString(6, 'numeric');
-    db.prepare('INSERT INTO email_verification_codes (code, email) VALUES (?, ?)').run(code, email);
-    console.log(`Generated email verification code ${code} for ${email}`);
+    db.prepare('INSERT INTO email_verification_codes (code, email) VALUES (?, ?)').run(code, address);
+    console.log(`Generated email verification code ${code} for ${address}`);
     await sendEmail(
         'Volunteer Platform',
-        email,
+        address,
         'Verify your email',
         `Hey new volunteer!\n\nTo keep your account safe, please verify your email address by entering the code below on the website:\n\n${code}\n\nIf you did not create an account, please ignore this email.\n\nThanks!`
     );
@@ -506,9 +506,9 @@ app.post('/api/events/create', requireLogin, requireAdmin, (req, res) => {
             const row = getSkillId.get(skill.toLowerCase());
             if (row) {
                 insertSkill.run(eventId, row.id);
-                console.log(`Inserted skill for event ${eventId}: ${skill}`);       
+                console.log(`Inserted skill for event ${eventId}: ${skill}`);
             }
-        }     
+        }
     });
 
     try {
@@ -549,7 +549,7 @@ app.post('/api/events/update', requireLogin, requireAdmin, (req, res) => {
 
         // Replace skills
         db.prepare(`DELETE FROM event_skills WHERE event_id = ?`).run(id);
-        
+
         const insertSkill = db.prepare(`INSERT INTO event_skills (event_id, skill_id) VALUES (?, ?)`);
         const getSkillId = db.prepare(`SELECT id FROM skills WHERE LOWER(REPLACE(label, ' ', '_')) = ?`);
         for (const skill of skills) {
@@ -875,7 +875,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
             SELECT s.label FROM user_skills us
             JOIN skills s ON us.skill_id = s.id
             WHERE us.user_id = ?
-        `).all(userId)
+        `).all(userId);
         const getHistory = db.prepare(`
             SELECT 
                 e.name as event_name,
