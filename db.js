@@ -74,7 +74,8 @@ const allSkills = [
 const insertSkill = db.prepare(`INSERT OR IGNORE INTO skills (id, label) VALUES (?, ?)`);
 
 for (const skill of allSkills) {
-    insertSkill.run(crypto.randomUUID(), skill);
+    const skillId = crypto.randomUUID().slice(0, 8); // Shorten to 8 characters like eventId
+    insertSkill.run(skillId, skill);
 }
 
 db.prepare(`CREATE TABLE IF NOT EXISTS user_skills (

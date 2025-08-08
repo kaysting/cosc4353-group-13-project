@@ -1379,7 +1379,7 @@ app.post('/api/skills/add', (req, res) => {
     if (!trimmed) return res.sendApiError(400, 'invalid_label', 'Label cannot be empty');
 
     try {
-        const id = crypto.randomUUID();
+        const id = crypto.randomUUID().slice(0, 8);
         db.prepare(`INSERT INTO skills (id, label) VALUES (?, ?)`).run(id, trimmed);
         res.sendApiOkay({ message: 'Skill added', id, label: trimmed });
     } catch (err) {
