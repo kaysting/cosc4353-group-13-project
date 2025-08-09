@@ -7,6 +7,11 @@ To run this project:
 4. Run `npm start` to start the server
 5. Navigate to <http://localhost:3000> to access the webapp
 
+To run tests and generate a coverage report:
+1. Follow the instructions above to ensure the server can start
+2. Run `npm run test:coverage`
+3. After completion a coverage report will be displayed
+
 ## Problem Statement
 
 A non-profit organization has requested to build a software application that will help manage and optimize their volunteer activities. The application should help the organization efficiently allocate volunteers to different events and tasks based on their preferences, skills, and availability. The application should consider the following criteria:

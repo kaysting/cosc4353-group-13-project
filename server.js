@@ -738,11 +738,10 @@ app.post('/api/events/match/assign', requireLogin, requireAdmin, (req, res) => {
 });
 
 // Get notifications for the current user
-// Get notifications for the current user
 app.get('/api/notifications', requireLogin, (req, res) => {
     try {
         const notifications = db.prepare(`
-            SELECT id, header, description, time, is_unread
+            SELECT *
             FROM notifications
             WHERE user_id = ?
             ORDER BY time DESC
@@ -875,7 +874,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
             SELECT s.label FROM user_skills us
             JOIN skills s ON us.skill_id = s.id
             WHERE us.user_id = ?
-        `).all(userId);
+        `);
         const getHistory = db.prepare(`
             SELECT 
                 e.name as event_name,
@@ -890,7 +889,7 @@ app.get('/api/reports/volunteers', requireLogin, requireAdmin, async (req, res) 
         `);
 
         const volunteerData = volunteers.map(vol => {
-            const skills = getSkills.all(vol.id).map(s => s.skill);
+            const skills = getSkills.all(vol.id).map(s => s.label);
             const history = getHistory.all(vol.id);
 
             return {
@@ -1441,6 +1440,8 @@ app.use((req, res, next) => {
         // API route not found
         return res.status(404).json({ success: false, code: 'not_found', message: 'API endpoint not found' });
     }
+    // Allow test-defined error route to be added later without being intercepted here
+    if (req.originalUrl === '/throw') return next();
     res.sendFile(__dirname + '/public/index.html');
 });
 
